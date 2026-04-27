@@ -4,7 +4,7 @@ export function CalendarPage() {
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-900">{t("pageCalendarTitle")}</h1>
-      <p className="text-gray-600 mt-2">Stránka kalendára</p>
+      <p className="text-gray-600 mt-2">{t("pageCalendarDescription")}</p>
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { createBrowserRouter, RouterProvider } from "react-router-dom"
+import { createBrowserRouter, RouterProvider, Navigate } from "react-router-dom"
 import { AppLayout } from "./components/layout/AppLayout"
 import { CalendarPage } from "./pages/CalendarPage"
 import { OwnersPage } from "./pages/OwnersPage"
@@ -9,12 +9,12 @@ import { SettingsPage } from "./pages/SettingsPage"
 const router = createBrowserRouter([
   {
     path: "/",
+    element: <Navigate to="/calendar" replace />,
+  },
+  {
+    path: "/",
     element: <AppLayout />,
     children: [
-      {
-        index: true,
-        element: <CalendarPage />,
-      },
       {
         path: "calendar",
         element: <CalendarPage />,

@@ -1,5 +1,4 @@
 import { t } from "@/i18n/sk"
-import { Search } from "lucide-react"
 
 export function TopBar() {
   return (
@@ -8,14 +7,6 @@ export function TopBar() {
         <div className="flex items-center gap-2">
           <span className="text-xl">🐾</span>
           <span className="font-bold text-lg">{t("appName")}</span>
-        </div>
-        <div className="flex items-center gap-2 bg-slate-800 rounded-lg px-3 py-1.5 w-64">
-          <Search size={16} className="text-slate-400" />
-          <input
-            type="text"
-            placeholder={t("navCalendar")}
-            className="bg-transparent border-none outline-none text-sm text-white placeholder-slate-400 w-full"
-          />
         </div>
       </div>
     </header>
