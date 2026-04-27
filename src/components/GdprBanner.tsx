@@ -1,7 +1,5 @@
-"use client"
-
 import { useState, useEffect } from "react"
-import Link from "next/link"
+import { Link } from "react-router-dom"
 
 export function GdprBanner() {
   const [visible, setVisible] = useState(false)
@@ -19,7 +17,7 @@ export function GdprBanner() {
         <p className="text-sm text-gray-600 flex-1">
           Táto aplikácia ukladá osobné údaje klientov (meno, telefón, poznámky)
           v súlade s{" "}
-          <Link href="/gdpr" className="underline text-brand-600">
+          <Link to="/gdpr" className="underline text-brand-600">
             GDPR
           </Link>
           . Údaje sú chránené a nie sú zdieľané s tretími stranami.

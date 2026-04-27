@@ -1,7 +1,4 @@
-"use client"
-
-import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { Link, useLocation } from "react-router-dom"
 import { CalendarDays, Users, PlusCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -11,7 +8,7 @@ const links = [
 ]
 
 export function Navigation() {
-  const pathname = usePathname()
+  const pathname = useLocation().pathname
 
   return (
     <header className="bg-white border-b border-purple-100 shadow-sm sticky top-0 z-40">
@@ -25,7 +22,7 @@ export function Navigation() {
           {links.map(({ href, label, icon: Icon }) => (
             <Link
               key={href}
-              href={href}
+              to={href}
               className={cn(
                 "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors",
                 pathname === href
@@ -39,7 +36,7 @@ export function Navigation() {
           ))}
 
           <Link
-            href="/appointments/new"
+            to="/appointments/new"
             className="ml-2 flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-brand-600 text-white hover:bg-brand-700 transition-colors shadow-sm"
           >
             <PlusCircle size={16} />
