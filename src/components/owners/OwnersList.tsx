@@ -31,7 +31,7 @@ export function OwnersList({ owners, onEdit, onDelete }: OwnersListProps) {
               <TableHead>{t('labelPhone')}</TableHead>
               <TableHead>{t('labelEmail')}</TableHead>
               <TableHead className="text-right">{t('labelNotes')}</TableHead>
-              <TableHead className="text-right">Akcie</TableHead>
+              <TableHead className="text-right">{t('columnActions')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

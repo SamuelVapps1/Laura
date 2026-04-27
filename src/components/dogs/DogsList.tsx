@@ -38,7 +38,7 @@ export function DogsList({ dogs, owners, onEdit, onDelete }: DogsListProps) {
               <TableHead>{t('labelBreed')}</TableHead>
               <TableHead>{t('labelSex')}</TableHead>
               <TableHead>{t('labelAge')}</TableHead>
-              <TableHead className="text-right">Akcie</TableHead>
+              <TableHead className="text-right">{t('columnActions')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

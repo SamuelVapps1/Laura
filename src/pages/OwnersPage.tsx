@@ -4,6 +4,7 @@ import { t } from '@/i18n/sk'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { db, type Owner } from '@/db/db'
+import { normalizeSearchText } from '@/db/search'
 import { OwnerFormDialog } from '@/components/owners/OwnerFormDialog'
 import { DeleteOwnerDialog } from '@/components/owners/DeleteOwnerDialog'
 import { OwnersList } from '@/components/owners/OwnersList'
@@ -13,13 +14,13 @@ export function OwnersPage() {
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingOwner, setEditingOwner] = useState<Owner | undefined>()
   const [deletingOwner, setDeletingOwner] = useState<Owner | undefined>()
-  const [refreshKey, setRefreshKey] = useState(0)
+  const normalizedSearch = normalizeSearchText(search)
 
   const owners = useLiveQuery(
     () => db.owners
-      .filter(owner => owner._search.includes(search.toLowerCase()))
+      .filter(owner => owner._search.includes(normalizedSearch))
       .sortBy('fullName'),
-    [search, refreshKey],
+    [normalizedSearch],
     []
   )
 
@@ -35,14 +36,6 @@ export function OwnersPage() {
 
   const handleDelete = (owner: Owner) => {
     setDeletingOwner(owner)
-  }
-
-  const handleFormSuccess = () => {
-    setRefreshKey(prev => prev + 1)
-  }
-
-  const handleDeleteSuccess = () => {
-    setRefreshKey(prev => prev + 1)
   }
 
   return (
@@ -73,7 +66,7 @@ export function OwnersPage() {
         open={isFormOpen}
         onOpenChange={setIsFormOpen}
         owner={editingOwner}
-        onSuccess={handleFormSuccess}
+        onSuccess={() => undefined}
       />
 
       {deletingOwner && (
@@ -81,7 +74,7 @@ export function OwnersPage() {
           open={!!deletingOwner}
           onOpenChange={(open) => !open && setDeletingOwner(undefined)}
           owner={deletingOwner}
-          onSuccess={handleDeleteSuccess}
+          onSuccess={() => undefined}
         />
       )}
     </div>

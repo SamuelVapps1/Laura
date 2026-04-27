@@ -1,6 +1,7 @@
 import { db, type Owner, type NewOwnerInput, type UpdateOwnerInput } from '../db'
+import { DB_ERROR } from '../errors'
 import { generateId } from '../ids'
-import { buildOwnerSearch } from '../search'
+import { buildDogSearch, buildOwnerSearch } from '../search'
 
 export async function createOwner(input: NewOwnerInput): Promise<Owner> {
   const now = new Date().toISOString()
@@ -24,34 +25,48 @@ export async function createOwner(input: NewOwnerInput): Promise<Owner> {
 }
 
 export async function updateOwner(id: string, patch: UpdateOwnerInput): Promise<Owner> {
-  const existing = await db.owners.get(id)
-  if (!existing) {
-    throw new Error('Owner not found')
-  }
-  
-  const updated: Owner = {
-    ...existing,
-    fullName: patch.fullName ?? existing.fullName,
-    phone: patch.phone !== undefined ? patch.phone : existing.phone,
-    email: patch.email !== undefined ? patch.email : existing.email,
-    notes: patch.notes !== undefined ? patch.notes : existing.notes,
-    updatedAt: new Date().toISOString(),
-    _search: ''
-  }
-  
-  updated._search = buildOwnerSearch(updated)
-  
-  await db.owners.put(updated)
-  return updated
+  return db.transaction('rw', db.owners, db.dogs, async () => {
+    const existing = await db.owners.get(id)
+    if (!existing) {
+      throw new Error(DB_ERROR.OWNER_NOT_FOUND)
+    }
+
+    const updated: Owner = {
+      ...existing,
+      fullName: patch.fullName ?? existing.fullName,
+      phone: patch.phone !== undefined ? patch.phone : existing.phone,
+      email: patch.email !== undefined ? patch.email : existing.email,
+      notes: patch.notes !== undefined ? patch.notes : existing.notes,
+      updatedAt: new Date().toISOString(),
+      _search: ''
+    }
+
+    updated._search = buildOwnerSearch(updated)
+
+    await db.owners.put(updated)
+
+    const dogs = await db.dogs.where('ownerId').equals(id).toArray()
+    await Promise.all(
+      dogs.map((dog) =>
+        db.dogs.update(dog.id, {
+          _search: buildDogSearch(dog, updated)
+        })
+      )
+    )
+
+    return updated
+  })
 }
 
 export async function deleteOwner(id: string): Promise<void> {
-  const dogCount = await db.dogs.where('ownerId').equals(id).count()
-  if (dogCount > 0) {
-    throw new Error('Cannot delete owner with dogs')
-  }
-  
-  await db.owners.delete(id)
+  await db.transaction('rw', db.owners, db.dogs, async () => {
+    const dogCount = await db.dogs.where('ownerId').equals(id).count()
+    if (dogCount > 0) {
+      throw new Error(DB_ERROR.OWNER_HAS_DOGS)
+    }
+
+    await db.owners.delete(id)
+  })
 }
 
 export async function getOwnerById(id: string): Promise<Owner | undefined> {

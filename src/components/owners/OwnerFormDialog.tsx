@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { t } from '@/i18n/sk'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,12 +15,22 @@ interface OwnerFormDialogProps {
 }
 
 export function OwnerFormDialog({ open, onOpenChange, owner, onSuccess }: OwnerFormDialogProps) {
-  const [fullName, setFullName] = useState(owner?.fullName ?? '')
-  const [phone, setPhone] = useState(owner?.phone ?? '')
-  const [email, setEmail] = useState(owner?.email ?? '')
-  const [notes, setNotes] = useState(owner?.notes ?? '')
+  const [fullName, setFullName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [email, setEmail] = useState('')
+  const [notes, setNotes] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+
+    setFullName(owner?.fullName ?? '')
+    setPhone(owner?.phone ?? '')
+    setEmail(owner?.email ?? '')
+    setNotes(owner?.notes ?? '')
+    setError(null)
+  }, [open, owner])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -123,7 +133,7 @@ export function OwnerFormDialog({ open, onOpenChange, owner, onSuccess }: OwnerF
               {t('buttonCancel')}
             </Button>
             <Button type="submit" disabled={isSaving}>
-              {isSaving ? t('buttonSave') + '...' : t('buttonSave')}
+              {isSaving ? t('buttonSaving') : t('buttonSave')}
             </Button>
           </DialogFooter>
         </form>

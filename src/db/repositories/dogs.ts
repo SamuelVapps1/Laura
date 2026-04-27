@@ -1,11 +1,12 @@
 import { db, type Dog, type Owner, type NewDogInput, type UpdateDogInput } from '../db'
+import { DB_ERROR } from '../errors'
 import { generateId } from '../ids'
 import { buildDogSearch } from '../search'
 
 export async function createDog(input: NewDogInput): Promise<Dog> {
   const owner = await db.owners.get(input.ownerId)
   if (!owner) {
-    throw new Error('Owner not found')
+    throw new Error(DB_ERROR.OWNER_NOT_FOUND)
   }
   
   const now = new Date().toISOString()
@@ -38,14 +39,14 @@ export async function createDog(input: NewDogInput): Promise<Dog> {
 export async function updateDog(id: string, patch: UpdateDogInput): Promise<Dog> {
   const existing = await db.dogs.get(id)
   if (!existing) {
-    throw new Error('Dog not found')
+    throw new Error(DB_ERROR.DOG_NOT_FOUND)
   }
   
   let owner: Owner | undefined
   if (patch.ownerId !== undefined && patch.ownerId !== existing.ownerId) {
     owner = await db.owners.get(patch.ownerId)
     if (!owner) {
-      throw new Error('Owner not found')
+      throw new Error(DB_ERROR.OWNER_NOT_FOUND)
     }
   } else {
     owner = await db.owners.get(existing.ownerId)

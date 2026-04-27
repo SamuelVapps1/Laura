@@ -3,6 +3,7 @@ import { t } from '@/i18n/sk'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import type { Owner } from '@/db/db'
+import { DB_ERROR } from '@/db/errors'
 import { deleteOwner } from '@/db/repositories/owners'
 
 interface DeleteOwnerDialogProps {
@@ -24,7 +25,8 @@ export function DeleteOwnerDialog({ open, onOpenChange, owner, onSuccess }: Dele
       onSuccess()
       onOpenChange(false)
     } catch (err) {
-      setError((err as Error).message || t('validationError'))
+      const message = (err as Error).message
+      setError(message === DB_ERROR.OWNER_HAS_DOGS ? t('errorCannotDeleteOwnerWithDogs') : t('validationError'))
     } finally {
       setIsDeleting(false)
     }
@@ -47,7 +49,7 @@ export function DeleteOwnerDialog({ open, onOpenChange, owner, onSuccess }: Dele
             {t('buttonCancel')}
           </Button>
           <Button type="button" variant="destructive" onClick={handleDelete} disabled={isDeleting}>
-            {isDeleting ? t('buttonDelete') + '...' : t('buttonConfirm')}
+            {isDeleting ? t('buttonDeleting') : t('buttonConfirm')}
           </Button>
         </DialogFooter>
       </DialogContent>

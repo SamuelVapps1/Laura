@@ -24,7 +24,7 @@ export function DeleteDogDialog({ open, onOpenChange, dog, onSuccess }: DeleteDo
       onSuccess()
       onOpenChange(false)
     } catch (err) {
-      setError((err as Error).message || t('validationError'))
+      setError(t('validationError'))
     } finally {
       setIsDeleting(false)
     }
@@ -47,7 +47,7 @@ export function DeleteDogDialog({ open, onOpenChange, dog, onSuccess }: DeleteDo
             {t('buttonCancel')}
           </Button>
           <Button type="button" variant="destructive" onClick={handleDelete} disabled={isDeleting}>
-            {isDeleting ? t('buttonDelete') + '...' : t('buttonConfirm')}
+            {isDeleting ? t('buttonDeleting') : t('buttonConfirm')}
           </Button>
         </DialogFooter>
       </DialogContent>

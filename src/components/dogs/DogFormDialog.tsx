@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { t } from '@/i18n/sk'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { Dog, Owner, NewDogInput } from '@/db/db'
 import { createDog, updateDog } from '@/db/repositories/dogs'
+import { OwnerSearchSelect } from './OwnerSearchSelect'
 
 interface DogFormDialogProps {
   open: boolean
@@ -17,19 +18,36 @@ interface DogFormDialogProps {
 }
 
 export function DogFormDialog({ open, onOpenChange, dog, owners, onSuccess }: DogFormDialogProps) {
-  const [ownerId, setOwnerId] = useState(dog?.ownerId ?? '')
-  const [name, setName] = useState(dog?.name ?? '')
-  const [breed, setBreed] = useState(dog?.breed ?? '')
-  const [age, setAge] = useState(dog?.age ?? '')
-  const [sex, setSex] = useState<'male' | 'female' | 'unknown'>(dog?.sex ?? 'unknown')
-  const [color, setColor] = useState(dog?.color ?? '')
-  const [weightKg, setWeightKg] = useState(dog?.weightKg?.toString() ?? '')
-  const [behaviorNotes, setBehaviorNotes] = useState(dog?.behaviorNotes ?? '')
-  const [healthNotes, setHealthNotes] = useState(dog?.healthNotes ?? '')
-  const [groomingNotes, setGroomingNotes] = useState(dog?.groomingNotes ?? '')
-  const [priceNotes, setPriceNotes] = useState(dog?.priceNotes ?? '')
+  const [ownerId, setOwnerId] = useState('')
+  const [name, setName] = useState('')
+  const [breed, setBreed] = useState('')
+  const [age, setAge] = useState('')
+  const [sex, setSex] = useState<'male' | 'female' | 'unknown'>('unknown')
+  const [color, setColor] = useState('')
+  const [weightKg, setWeightKg] = useState('')
+  const [behaviorNotes, setBehaviorNotes] = useState('')
+  const [healthNotes, setHealthNotes] = useState('')
+  const [groomingNotes, setGroomingNotes] = useState('')
+  const [priceNotes, setPriceNotes] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+
+    setOwnerId(dog?.ownerId ?? '')
+    setName(dog?.name ?? '')
+    setBreed(dog?.breed ?? '')
+    setAge(dog?.age ?? '')
+    setSex(dog?.sex ?? 'unknown')
+    setColor(dog?.color ?? '')
+    setWeightKg(dog?.weightKg?.toString() ?? '')
+    setBehaviorNotes(dog?.behaviorNotes ?? '')
+    setHealthNotes(dog?.healthNotes ?? '')
+    setGroomingNotes(dog?.groomingNotes ?? '')
+    setPriceNotes(dog?.priceNotes ?? '')
+    setError(null)
+  }, [open, dog])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -51,6 +69,12 @@ export function DogFormDialog({ open, onOpenChange, dog, owners, onSuccess }: Do
       return
     }
 
+    const parsedWeight = weightKg.trim() ? Number(weightKg) : null
+    if (parsedWeight !== null && (!Number.isFinite(parsedWeight) || parsedWeight < 0)) {
+      setError(t('errorInvalidWeight'))
+      return
+    }
+
     setIsSaving(true)
     try {
       const input: NewDogInput = {
@@ -60,7 +84,7 @@ export function DogFormDialog({ open, onOpenChange, dog, owners, onSuccess }: Do
         age: age.trim() || null,
         sex,
         color: color.trim() || null,
-        weightKg: weightKg ? parseFloat(weightKg) : null,
+        weightKg: parsedWeight,
         behaviorNotes: behaviorNotes.trim() || null,
         healthNotes: healthNotes.trim() || null,
         groomingNotes: groomingNotes.trim() || null,
@@ -113,21 +137,7 @@ export function DogFormDialog({ open, onOpenChange, dog, owners, onSuccess }: Do
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="owner">{t('labelOwner')} *</Label>
-              <Select value={ownerId} onValueChange={setOwnerId}>
-                <SelectTrigger id="owner">
-                  <SelectValue placeholder={t('placeholderSelectOwner')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {owners.map((owner) => (
-                    <SelectItem key={owner.id} value={owner.id}>
-                      {owner.fullName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <OwnerSearchSelect owners={owners} value={ownerId} onChange={setOwnerId} />
             <div className="grid gap-2">
               <Label htmlFor="name">{t('labelName')} *</Label>
               <Input
@@ -231,7 +241,7 @@ export function DogFormDialog({ open, onOpenChange, dog, owners, onSuccess }: Do
               {t('buttonCancel')}
             </Button>
             <Button type="submit" disabled={isSaving}>
-              {isSaving ? t('buttonSave') + '...' : t('buttonSave')}
+              {isSaving ? t('buttonSaving') : t('buttonSave')}
             </Button>
           </DialogFooter>
         </form>
