@@ -88,6 +88,8 @@ export const sk = {
   capturePhoto: "Odfotiť",
   processingPhoto: "Spracúvam fotku...",
   photoUploadError: "Fotku sa nepodarilo spracovať",
+  photoStorageQuotaError: "V zariadení nie je dosť miesta na uloženie fotky.",
+  photoProcessingError: "Fotku sa nepodarilo spracovať.",
   photoMissingBefore: "Chýba fotka pred",
   photoMissingAfter: "Chýba fotka po",
   photoComparison: "Porovnanie fotiek",

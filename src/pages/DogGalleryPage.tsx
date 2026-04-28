@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useCallback, useEffect } from 'react'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { ImageIcon } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 
@@ -21,7 +21,8 @@ type GallerySession = {
 
 export function DogGalleryPage() {
   const { dogId = '' } = useParams()
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const selectedSessionId = searchParams.get('session')
 
   const dog = useLiveQuery(
     async () => dogId ? (await db.dogs.get(dogId)) ?? null : null,
@@ -59,8 +60,28 @@ export function DogGalleryPage() {
         .sort((first, second) => new Date(second.appointment.startsAt).getTime() - new Date(first.appointment.startsAt).getTime())
     },
     [dogId],
-    []
   )
+  const loadedGallerySessions = gallerySessions ?? []
+  const selectedSession = selectedSessionId
+    ? loadedGallerySessions.find((row) => row.session.id === selectedSessionId) ?? null
+    : null
+
+  const openComparison = useCallback((sessionId: string): void => {
+    const next = new URLSearchParams(searchParams)
+    next.set('session', sessionId)
+    setSearchParams(next)
+  }, [searchParams, setSearchParams])
+
+  const closeComparison = useCallback((): void => {
+    const next = new URLSearchParams(searchParams)
+    next.delete('session')
+    setSearchParams(next, { replace: true })
+  }, [searchParams, setSearchParams])
+
+  useEffect(() => {
+    if (gallerySessions === undefined || !selectedSessionId || selectedSession) return
+    closeComparison()
+  }, [closeComparison, gallerySessions, selectedSession, selectedSessionId])
 
   if (dog === undefined) {
     return null
@@ -93,7 +114,7 @@ export function DogGalleryPage() {
         </Button>
       </div>
 
-      {gallerySessions.length === 0 ? (
+      {loadedGallerySessions.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-gray-500">
             {t('emptyDogGallery')}
@@ -101,7 +122,7 @@ export function DogGalleryPage() {
         </Card>
       ) : (
         <div className="grid gap-4">
-          {gallerySessions.map((row) => (
+          {loadedGallerySessions.map((row) => (
             <Card key={row.session.id}>
               <CardHeader className="p-4">
                 <CardTitle className="text-base">{formatAppointmentDateTime(row.appointment)}</CardTitle>
@@ -113,7 +134,7 @@ export function DogGalleryPage() {
                 <button
                   type="button"
                   className="grid gap-3 text-left md:grid-cols-2"
-                  onClick={() => setSelectedSessionId(row.session.id)}
+                  onClick={() => openComparison(row.session.id)}
                 >
                   <GalleryThumb label={t('labelBefore')} photo={row.beforeThumb} missingLabel={t('photoMissingBefore')} />
                   <GalleryThumb label={t('labelAfter')} photo={row.afterThumb} missingLabel={t('photoMissingAfter')} />
@@ -124,15 +145,15 @@ export function DogGalleryPage() {
         </div>
       )}
 
-      {selectedSessionId && (
+      {selectedSession && (
         <PhotoComparisonModal
-          open={!!selectedSessionId}
+          open={!!selectedSession}
           onOpenChange={(open) => {
             if (!open) {
-              setSelectedSessionId(null)
+              closeComparison()
             }
           }}
-          sessionId={selectedSessionId}
+          sessionId={selectedSession.session.id}
         />
       )}
     </div>

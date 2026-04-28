@@ -35,10 +35,8 @@ type ImageDimensions = {
 
 export async function processAndStorePhoto(file: File, options: PhotoProcessingOptions): Promise<void> {
   try {
-    const [fullBlob, thumbBlob] = await Promise.all([
-      imageCompression(file, FULL_OPTIONS),
-      imageCompression(file, THUMB_OPTIONS),
-    ])
+    const fullBlob = await imageCompression(file, FULL_OPTIONS)
+    const thumbBlob = await imageCompression(fullBlob, THUMB_OPTIONS)
     const [fullDimensions, thumbDimensions] = await Promise.all([
       getImageDimensions(fullBlob),
       getImageDimensions(thumbBlob),
@@ -63,6 +61,10 @@ export async function processAndStorePhoto(file: File, options: PhotoProcessingO
   } catch (error) {
     if (error instanceof Error && isDatabaseErrorMessage(error.message)) {
       throw error
+    }
+
+    if (isStorageQuotaError(error)) {
+      throw new Error(DB_ERROR.PHOTO_STORAGE_QUOTA_EXCEEDED)
     }
 
     throw new Error(DB_ERROR.PHOTO_PROCESSING_FAILED)
@@ -94,4 +96,10 @@ async function getImageDimensions(blob: Blob): Promise<ImageDimensions> {
 
 function isDatabaseErrorMessage(message: string): boolean {
   return Object.values(DB_ERROR).some((code) => code === message)
+}
+
+function isStorageQuotaError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false
+
+  return error.name === 'QuotaExceededError' || /quota|storage/i.test(error.message)
 }

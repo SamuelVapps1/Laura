@@ -5,6 +5,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { PhotoComparisonModal } from '@/components/photos/PhotoComparisonModal'
 import { Button } from '@/components/ui/button'
 import type { PhotoAsset, PhotoKind } from '@/db/db'
+import { DB_ERROR } from '@/db/errors'
 import {
   getOrCreatePhotoSessionForAppointment,
   getSessionPhotos,
@@ -78,8 +79,8 @@ export function AppointmentPhotoSection({ appointmentId, dogId }: AppointmentPho
         sessionId,
         kind,
       })
-    } catch {
-      setErrors((current) => ({ ...current, [kind]: t('photoUploadError') }))
+    } catch (error) {
+      setErrors((current) => ({ ...current, [kind]: getPhotoErrorMessage(error) }))
     } finally {
       setProcessing((current) => ({ ...current, [kind]: false }))
     }
@@ -109,6 +110,27 @@ export function AppointmentPhotoSection({ appointmentId, dogId }: AppointmentPho
       )}
     </div>
   )
+}
+
+function getPhotoErrorMessage(error: unknown): string {
+  if (!(error instanceof Error)) return t('photoUploadError')
+
+  if (error.message === DB_ERROR.PHOTO_PROCESSING_FAILED) {
+    return t('photoProcessingError')
+  }
+
+  if (error.message === DB_ERROR.PHOTO_STORAGE_QUOTA_EXCEEDED) {
+    return t('photoStorageQuotaError')
+  }
+
+  if (
+    error.message === DB_ERROR.PHOTO_SESSION_NOT_FOUND ||
+    error.message === DB_ERROR.INVALID_PHOTO_KIND
+  ) {
+    return t('photoUploadError')
+  }
+
+  return t('photoUploadError')
 }
 
 function PhotoSlot({
