@@ -261,7 +261,7 @@ export const sk = {
   errorPasswordInvalid: "Nesprávne heslo",
   errorPasswordAlreadySet: "Heslo už je nastavené",
   errorPasswordNotSet: "Heslo nie je nastavené",
-  errorPasswordConfigInvalid: "Nastavenie hesla je poškodené. Obnovte aplikáciu zo zálohy alebo odstráňte heslo.",
+  errorPasswordConfigInvalid: "Nastavenie hesla je poškodené. Obnovte aplikáciu zo zálohy alebo vymažte dáta stránky a následne obnovte zálohu.",
   confirmRemovePasswordTitle: "Odstrániť heslo?",
   confirmRemovePasswordDescription: "Aplikácia sa už nebude pri spustení zamykať. Dáta zostanú zachované.",
   appLockedInfo: "Aplikácia je uzamknutá v tomto zariadení.",

@@ -31,3 +31,4 @@ tsconfig.tsbuildinfo
 .env.local
 .env
 *.env
+.claude/

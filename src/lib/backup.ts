@@ -123,6 +123,7 @@ export class BackupError extends Error {
 const APP_NAME = 'Salón pre psov'
 const PHOTO_DIR = 'photos'
 const PHOTO_FILE_PATTERN = /^photos\/[^/\\]+\.webp$/
+const ENCRYPTED_OUTER_ALLOWED_FILES = new Set(['manifest.json', 'payload.bin'])
 const PHOTO_KINDS = ['before', 'after'] as const satisfies readonly PhotoKind[]
 const PHOTO_VARIANTS = ['full', 'thumb'] as const satisfies readonly PhotoVariant[]
 const NOTE_SCOPES = ['appointment', 'owner', 'dog'] as const
@@ -365,6 +366,8 @@ async function parseEncryptedOuterBackup(
   manifest: EncryptedBackupManifest,
   password: string | undefined
 ): Promise<ParsedBackupPreview> {
+  validateEncryptedOuterEnvelope(unzipped)
+
   const trimmed = password?.trim() ?? ''
   if (!trimmed) {
     throw new BackupError('encrypted_backup_password_required')
@@ -433,6 +436,19 @@ async function parseEncryptedOuterBackup(
     }
 
     throw error
+  }
+}
+
+function validateEncryptedOuterEnvelope(unzipped: Record<string, Uint8Array>): void {
+  const keys = Object.keys(unzipped)
+  if (keys.length !== 2) {
+    throw new BackupError('encrypted_backup_invalid')
+  }
+
+  for (const key of keys) {
+    if (!ENCRYPTED_OUTER_ALLOWED_FILES.has(key)) {
+      throw new BackupError('encrypted_backup_invalid')
+    }
   }
 }
 
