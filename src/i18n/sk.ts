@@ -179,10 +179,55 @@ export const sk = {
   errorTagTargetNotFound: "Cieľ štítku nebol nájdený",
   buttonApplyTag: "Pridať štítok",
   buttonRemoveTag: "Odstrániť štítok",
+  settingsBackupTitle: "Záloha",
+  settingsPasswordTitle: "Heslo",
+  settingsStorageTitle: "Úložisko",
+  settingsAboutTitle: "O aplikácii",
+  downloadBackup: "Stiahnuť zálohu",
+  restoreBackup: "Obnoviť zo zálohy",
+  chooseBackupFile: "Vybrať ZIP zálohu",
+  confirmRestoreTitle: "Obnoviť zo zálohy?",
+  confirmRestoreDescription: "Obnova nahradí všetky aktuálne lokálne dáta dátami zo zálohy.",
+  restoreConfirmButton: "Obnoviť",
+  backupExporting: "Vytváram zálohu...",
+  backupExportDone: "Záloha bola stiahnutá",
+  backupExportError: "Zálohu sa nepodarilo vytvoriť",
+  backupParsing: "Kontrolujem zálohu...",
+  backupRestoreProgress: "Obnovujem dáta...",
+  backupRestoreDone: "Záloha bola obnovená",
+  backupRestoreError: "Zálohu sa nepodarilo obnoviť",
+  backupInvalidFile: "Súbor nie je platná záloha tejto aplikácie",
+  backupUnsupportedVersion: "Táto verzia zálohy nie je podporovaná",
+  backupCurrentDataWillBeReplaced: "Aktuálne dáta budú nahradené.",
+  backupCountOwners: "Majitelia",
+  backupCountDogs: "Psíky",
+  backupCountAppointments: "Termíny",
+  backupCountNotes: "Poznámky",
+  backupCountTags: "Štítky",
+  backupCountPhotos: "Fotky",
+  backupCountPhotoSessions: "Foto relácie",
+  storageUsed: "Použité",
+  storageAvailable: "Dostupné",
+  storageEstimateUnavailable: "Informácie o úložisku nie sú dostupné",
+  passwordNotEnabled: "Ochrana heslom nie je v tejto verzii zapnutá.",
+  aboutOfflineFirst: "Aplikácia funguje lokálne v tomto zariadení. Pravidelne si sťahujte zálohu.",
+  backupNeverCreatedWarning: "Záloha ešte nebola vytvorená — odporúčame stiahnuť zálohu.",
+  backupOldWarning: "Posledná záloha pred {days} dňami — odporúčame stiahnuť novú.",
+  goToSettings: "Prejsť do nastavení",
+  backupSelectedFile: "Vybraný súbor",
+  backupFormatVersion: "Verzia formátu zálohy",
+  backupCountWarning: "Počty v zálohe sa nezhodujú s obsahom. Skontrolujte súbor.",
+  backupInvalidDateWarning: "Dátum poslednej zálohy je neplatný — odporúčame stiahnuť zálohu.",
+  storageUnitMb: "MB",
+  storageUnitGb: "GB",
 } as const
 
 export type TranslationKey = keyof typeof sk
 
 export function t(key: TranslationKey): string {
   return sk[key]
+}
+
+export function formatBackupOldWarning(days: number): string {
+  return sk.backupOldWarning.replace("{days}", String(days))
 }
