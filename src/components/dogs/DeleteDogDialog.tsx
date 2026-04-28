@@ -3,13 +3,14 @@ import { t } from '@/i18n/sk'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import type { Dog } from '@/db/db'
+import { DB_ERROR } from '@/db/errors'
 import { deleteDog } from '@/db/repositories/dogs'
 
 interface DeleteDogDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   dog: Dog
-  onSuccess: () => void
+  onSuccess?: () => void
 }
 
 export function DeleteDogDialog({ open, onOpenChange, dog, onSuccess }: DeleteDogDialogProps) {
@@ -21,10 +22,11 @@ export function DeleteDogDialog({ open, onOpenChange, dog, onSuccess }: DeleteDo
     setIsDeleting(true)
     try {
       await deleteDog(dog.id)
-      onSuccess()
+      onSuccess?.()
       onOpenChange(false)
     } catch (err) {
-      setError(t('validationError'))
+      const message = (err as Error).message
+      setError(message === DB_ERROR.DOG_NOT_FOUND ? t('errorDogNotFound') : t('validationError'))
     } finally {
       setIsDeleting(false)
     }

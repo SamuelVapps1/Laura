@@ -11,7 +11,7 @@ interface OwnerFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   owner?: Owner
-  onSuccess: () => void
+  onSuccess?: () => void
 }
 
 export function OwnerFormDialog({ open, onOpenChange, owner, onSuccess }: OwnerFormDialogProps) {
@@ -56,7 +56,7 @@ export function OwnerFormDialog({ open, onOpenChange, owner, onSuccess }: OwnerF
         await createOwner(input)
       }
 
-      onSuccess()
+      onSuccess?.()
       onOpenChange(false)
       resetForm()
     } catch (err) {

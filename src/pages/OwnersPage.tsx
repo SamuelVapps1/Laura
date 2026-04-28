@@ -66,7 +66,6 @@ export function OwnersPage() {
         open={isFormOpen}
         onOpenChange={setIsFormOpen}
         owner={editingOwner}
-        onSuccess={() => undefined}
       />
 
       {deletingOwner && (
@@ -74,7 +73,6 @@ export function OwnersPage() {
           open={!!deletingOwner}
           onOpenChange={(open) => !open && setDeletingOwner(undefined)}
           owner={deletingOwner}
-          onSuccess={() => undefined}
         />
       )}
     </div>

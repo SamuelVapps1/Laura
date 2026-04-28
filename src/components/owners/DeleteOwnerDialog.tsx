@@ -10,7 +10,7 @@ interface DeleteOwnerDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   owner: Owner
-  onSuccess: () => void
+  onSuccess?: () => void
 }
 
 export function DeleteOwnerDialog({ open, onOpenChange, owner, onSuccess }: DeleteOwnerDialogProps) {
@@ -22,7 +22,7 @@ export function DeleteOwnerDialog({ open, onOpenChange, owner, onSuccess }: Dele
     setIsDeleting(true)
     try {
       await deleteOwner(owner.id)
-      onSuccess()
+      onSuccess?.()
       onOpenChange(false)
     } catch (err) {
       const message = (err as Error).message

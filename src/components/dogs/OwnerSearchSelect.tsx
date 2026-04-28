@@ -15,6 +15,7 @@ interface OwnerSearchSelectProps {
 export function OwnerSearchSelect({ owners, value, onChange }: OwnerSearchSelectProps) {
   const selectedOwner = owners.find((owner) => owner.id === value)
   const [query, setQuery] = useState(selectedOwner?.fullName ?? '')
+  const [isOpen, setIsOpen] = useState(false)
 
   useEffect(() => {
     setQuery(selectedOwner?.fullName ?? '')
@@ -43,6 +44,7 @@ export function OwnerSearchSelect({ owners, value, onChange }: OwnerSearchSelect
 
   const handleQueryChange = (nextQuery: string) => {
     setQuery(nextQuery)
+    setIsOpen(true)
     if (value && normalizeSearchText(nextQuery) !== normalizeSearchText(selectedOwner?.fullName)) {
       onChange('')
     }
@@ -51,38 +53,53 @@ export function OwnerSearchSelect({ owners, value, onChange }: OwnerSearchSelect
   const handleSelect = (owner: Owner) => {
     onChange(owner.id)
     setQuery(owner.fullName)
+    setIsOpen(false)
+  }
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Escape') {
+      setIsOpen(false)
+    }
   }
 
   return (
-    <div className="grid gap-2">
+    <div className="grid gap-2" onBlur={(event) => {
+      if (!event.currentTarget.contains(event.relatedTarget)) {
+        setIsOpen(false)
+      }
+    }}>
       <Label htmlFor="owner">{t('labelOwner')} *</Label>
       <Input
         id="owner"
         value={query}
         onChange={(event) => handleQueryChange(event.target.value)}
+        onFocus={() => setIsOpen(true)}
+        onKeyDown={handleKeyDown}
         placeholder={t('placeholderSearchOwner')}
         autoComplete="off"
       />
-      <div className="max-h-40 overflow-y-auto rounded-md border border-input bg-background">
-        {filteredOwners.length > 0 ? (
-          filteredOwners.map((owner) => (
-            <Button
-              key={owner.id}
-              type="button"
-              variant={owner.id === value ? 'secondary' : 'ghost'}
-              className="w-full justify-start rounded-none"
-              onClick={() => handleSelect(owner)}
-            >
-              <span className="truncate">{owner.fullName}</span>
-              {owner.phone && <span className="ml-2 text-xs text-muted-foreground">{owner.phone}</span>}
-            </Button>
-          ))
-        ) : (
-          <div className="px-3 py-2 text-sm text-muted-foreground">
-            {t('emptyOwnerSearch')}
-          </div>
-        )}
-      </div>
+      {isOpen && (
+        <div className="max-h-40 overflow-y-auto rounded-md border border-input bg-background">
+          {filteredOwners.length > 0 ? (
+            filteredOwners.map((owner) => (
+              <Button
+                key={owner.id}
+                type="button"
+                variant={owner.id === value ? 'secondary' : 'ghost'}
+                className="w-full justify-start rounded-none"
+                onClick={() => handleSelect(owner)}
+              >
+                <span className="truncate">{owner.fullName}</span>
+                {owner.phone && <span className="ml-2 text-xs text-muted-foreground">{owner.phone}</span>}
+              </Button>
+            ))
+          ) : (
+            <div className="px-3 py-2 text-sm text-muted-foreground">
+              {t('emptyOwnerSearch')}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

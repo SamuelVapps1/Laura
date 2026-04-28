@@ -14,7 +14,7 @@ interface DogFormDialogProps {
   onOpenChange: (open: boolean) => void
   dog?: Dog
   owners: Owner[]
-  onSuccess: () => void
+  onSuccess?: () => void
 }
 
 export function DogFormDialog({ open, onOpenChange, dog, owners, onSuccess }: DogFormDialogProps) {
@@ -97,7 +97,7 @@ export function DogFormDialog({ open, onOpenChange, dog, owners, onSuccess }: Do
         await createDog(input)
       }
 
-      onSuccess()
+      onSuccess?.()
       onOpenChange(false)
       resetForm()
     } catch (err) {

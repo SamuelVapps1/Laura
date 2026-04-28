@@ -62,6 +62,7 @@ export const sk = {
   errorDogNameRequired: "Meno psíka je povinné",
   errorOwnerRequired: "Majiteľ je povinný",
   errorOwnerNotFound: "Majiteľ nebol nájdený",
+  errorDogNotFound: "Psík nebol nájdený",
   errorCannotDeleteOwnerWithDogs: "Nemôžete odstrániť majiteľa, ktorý má psíkov. Najprv odstráňte všetkých jeho psíkov.",
   errorInvalidWeight: "Váha musí byť platné nezáporné číslo",
   validationError: "Chyba validácie",

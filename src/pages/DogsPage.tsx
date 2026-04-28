@@ -74,7 +74,6 @@ export function DogsPage() {
         onOpenChange={setIsFormOpen}
         dog={editingDog}
         owners={owners || []}
-        onSuccess={() => undefined}
       />
 
       {deletingDog && (
@@ -82,7 +81,6 @@ export function DogsPage() {
           open={!!deletingDog}
           onOpenChange={(open) => !open && setDeletingDog(undefined)}
           dog={deletingDog}
-          onSuccess={() => undefined}
         />
       )}
     </div>
