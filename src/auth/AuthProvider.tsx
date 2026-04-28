@@ -57,7 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (state.kind === 'invalid') {
       // Corrupt/partial password config. Keep the gate up so private
       // content cannot render, but never pretend this is a normal
-      // verifier. LoginPage surfaces a recovery action.
+      // verifier. LoginPage shows an error; no bypass is available.
       recordRef.current = null
       configInvalidRef.current = true
       setPasswordEnabled(true)
