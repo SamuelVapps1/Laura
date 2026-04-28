@@ -1,4 +1,4 @@
-import type { Owner, Dog } from './db'
+import type { Owner, Dog, Appointment } from './db'
 
 export function normalizeSearchText(input: string | null | undefined): string {
   if (!input) return ''
