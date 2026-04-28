@@ -30,3 +30,24 @@ export function buildDogSearch(dog: Dog, owner?: Owner): string {
   ]
   return normalizeSearchText(parts.filter(Boolean).join(' '))
 }
+
+const appointmentStatusSearchLabels: Record<Appointment['status'], string> = {
+  scheduled: 'plánovaný',
+  done: 'vykonaný',
+  cancelled: 'zrušený',
+  no_show: 'nedostavil sa',
+}
+
+export function buildAppointmentSearch(appointment: Appointment, dog: Dog, owner: Owner): string {
+  const parts = [
+    dog.name,
+    dog.breed,
+    owner.fullName,
+    owner.phone,
+    appointment.serviceName,
+    appointment.status,
+    appointmentStatusSearchLabels[appointment.status],
+    appointment.notes,
+  ]
+  return normalizeSearchText(parts.filter(Boolean).join(' '))
+}

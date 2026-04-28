@@ -20,6 +20,10 @@ const router = createBrowserRouter([
         element: <CalendarPage />,
       },
       {
+        path: "calendar/appt/:appointmentId",
+        element: <CalendarPage />,
+      },
+      {
         path: "owners",
         element: <OwnersPage />,
       },
