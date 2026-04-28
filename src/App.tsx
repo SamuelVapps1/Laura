@@ -1,4 +1,6 @@
 import { createBrowserRouter, RouterProvider, Navigate } from "react-router-dom"
+import { AuthProvider } from "./auth/AuthProvider"
+import { RequireUnlock } from "./auth/RequireUnlock"
 import { AppLayout } from "./components/layout/AppLayout"
 import { CalendarPage } from "./pages/CalendarPage"
 import { OwnersPage } from "./pages/OwnersPage"
@@ -8,15 +10,24 @@ import { DogDetailPage } from "./pages/DogDetailPage"
 import { DogGalleryPage } from "./pages/DogGalleryPage"
 import { TagsPage } from "./pages/TagsPage"
 import { SettingsPage } from "./pages/SettingsPage"
+import { LoginPage } from "./pages/LoginPage"
 
 const router = createBrowserRouter([
+  {
+    path: "/login",
+    element: <LoginPage />,
+  },
   {
     path: "/",
     element: <Navigate to="/calendar" replace />,
   },
   {
     path: "/",
-    element: <AppLayout />,
+    element: (
+      <RequireUnlock>
+        <AppLayout />
+      </RequireUnlock>
+    ),
     children: [
       {
         path: "calendar",
@@ -59,5 +70,9 @@ const router = createBrowserRouter([
 ])
 
 export function App() {
-  return <RouterProvider router={router} />
+  return (
+    <AuthProvider>
+      <RouterProvider router={router} />
+    </AuthProvider>
+  )
 }

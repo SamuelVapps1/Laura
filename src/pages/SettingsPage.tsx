@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 
+import { useAuth } from '@/auth/AuthProvider'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -12,6 +13,13 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { PASSWORD_ERROR } from '@/db/errors'
+import {
+  changePassword as changePasswordRecord,
+  removePassword as removePasswordRecord,
+  setPassword as setPasswordRecord,
+} from '@/db/repositories/password'
+import { validatePasswordInput } from '@/lib/password'
 import {
   BACKUP_VERSION,
   BackupError,
@@ -207,14 +215,7 @@ export function SettingsPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('settingsPasswordTitle')}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-gray-600">{t('passwordNotEnabled')}</p>
-        </CardContent>
-      </Card>
+      <PasswordSection />
 
       <Card>
         <CardHeader>
@@ -246,6 +247,336 @@ export function SettingsPage() {
       />
     </div>
   )
+}
+
+type PasswordMessage = {
+  key: TranslationKey
+  tone: 'success' | 'error'
+} | null
+
+function PasswordSection() {
+  const auth = useAuth()
+  const [message, setMessage] = useState<PasswordMessage>(null)
+
+  const handleSetSuccess = (key: TranslationKey) => {
+    setMessage({ key, tone: 'success' })
+  }
+
+  const handleError = (key: TranslationKey) => {
+    setMessage({ key, tone: 'error' })
+  }
+
+  const clearMessage = () => setMessage(null)
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t('settingsPasswordTitle')}</CardTitle>
+        <CardDescription>{t('passwordSectionDescription')}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <p className="rounded-md border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900">
+          {t('passwordLockOnlyNotice')}
+        </p>
+
+        {auth.loading ? (
+          <p className="text-sm text-gray-600">…</p>
+        ) : auth.passwordEnabled ? (
+          <>
+            <p className="text-sm font-medium text-green-700">{t('passwordEnabled')}</p>
+            <ChangePasswordForm
+              onSuccess={handleSetSuccess}
+              onError={handleError}
+              onSubmitStart={clearMessage}
+            />
+            <RemovePasswordForm
+              onSuccess={handleSetSuccess}
+              onError={handleError}
+              onSubmitStart={clearMessage}
+            />
+          </>
+        ) : (
+          <>
+            <p className="text-sm text-gray-600">{t('passwordDisabled')}</p>
+            <SetPasswordForm
+              onSuccess={handleSetSuccess}
+              onError={handleError}
+              onSubmitStart={clearMessage}
+            />
+          </>
+        )}
+
+        {message && (
+          <div className={getMessageClassName(message.tone)}>
+            <p className="text-sm font-medium">{t(message.key)}</p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+type PasswordFormCallbacks = {
+  onSuccess: (key: TranslationKey) => void
+  onError: (key: TranslationKey) => void
+  onSubmitStart: () => void
+}
+
+function SetPasswordForm({ onSuccess, onError, onSubmitStart }: PasswordFormCallbacks) {
+  const auth = useAuth()
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (submitting) return
+    onSubmitStart()
+
+    const validation = validatePasswordInput(newPassword, confirmPassword)
+    if (validation) {
+      onError(mapValidationKey(validation))
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      await setPasswordRecord(newPassword)
+      await auth.refreshPasswordState()
+      auth.markCurrentSessionUnlocked()
+      setNewPassword('')
+      setConfirmPassword('')
+      onSuccess('passwordSetSuccess')
+    } catch (error) {
+      onError(mapPasswordError(error))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <form className="space-y-3" onSubmit={handleSubmit} noValidate>
+      <div className="space-y-2">
+        <Label htmlFor="settings-new-password">{t('labelNewPassword')}</Label>
+        <Input
+          id="settings-new-password"
+          type="password"
+          autoComplete="new-password"
+          value={newPassword}
+          onChange={(event) => setNewPassword(event.target.value)}
+          disabled={submitting}
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="settings-confirm-password">{t('labelConfirmPassword')}</Label>
+        <Input
+          id="settings-confirm-password"
+          type="password"
+          autoComplete="new-password"
+          value={confirmPassword}
+          onChange={(event) => setConfirmPassword(event.target.value)}
+          disabled={submitting}
+        />
+      </div>
+      <Button type="submit" disabled={submitting}>
+        {t('buttonSetPassword')}
+      </Button>
+    </form>
+  )
+}
+
+function ChangePasswordForm({ onSuccess, onError, onSubmitStart }: PasswordFormCallbacks) {
+  const auth = useAuth()
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (submitting) return
+    onSubmitStart()
+
+    if (!currentPassword) {
+      onError('errorPasswordRequired')
+      return
+    }
+
+    const validation = validatePasswordInput(newPassword, confirmPassword)
+    if (validation) {
+      onError(mapValidationKey(validation))
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      await changePasswordRecord(currentPassword, newPassword)
+      await auth.refreshPasswordState()
+      auth.markCurrentSessionUnlocked()
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+      onSuccess('passwordChangedSuccess')
+    } catch (error) {
+      onError(mapPasswordError(error))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <form className="space-y-3 border-t border-gray-200 pt-4" onSubmit={handleSubmit} noValidate>
+      <div className="space-y-2">
+        <Label htmlFor="settings-current-password-change">{t('labelCurrentPassword')}</Label>
+        <Input
+          id="settings-current-password-change"
+          type="password"
+          autoComplete="current-password"
+          value={currentPassword}
+          onChange={(event) => setCurrentPassword(event.target.value)}
+          disabled={submitting}
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="settings-change-new-password">{t('labelNewPassword')}</Label>
+        <Input
+          id="settings-change-new-password"
+          type="password"
+          autoComplete="new-password"
+          value={newPassword}
+          onChange={(event) => setNewPassword(event.target.value)}
+          disabled={submitting}
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="settings-change-confirm-password">{t('labelConfirmPassword')}</Label>
+        <Input
+          id="settings-change-confirm-password"
+          type="password"
+          autoComplete="new-password"
+          value={confirmPassword}
+          onChange={(event) => setConfirmPassword(event.target.value)}
+          disabled={submitting}
+        />
+      </div>
+      <Button type="submit" disabled={submitting}>
+        {t('buttonChangePassword')}
+      </Button>
+    </form>
+  )
+}
+
+function RemovePasswordForm({ onSuccess, onError, onSubmitStart }: PasswordFormCallbacks) {
+  const auth = useAuth()
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+
+  const handleRequestRemove = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (submitting) return
+    onSubmitStart()
+
+    if (!currentPassword) {
+      onError('errorPasswordRequired')
+      return
+    }
+
+    setConfirmOpen(true)
+  }
+
+  const handleConfirm = async () => {
+    setConfirmOpen(false)
+    setSubmitting(true)
+    try {
+      await removePasswordRecord(currentPassword)
+      await auth.refreshPasswordState()
+      setCurrentPassword('')
+      onSuccess('passwordRemovedSuccess')
+    } catch (error) {
+      onError(mapPasswordError(error))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <>
+      <form className="space-y-3 border-t border-gray-200 pt-4" onSubmit={handleRequestRemove} noValidate>
+        <div className="space-y-2">
+          <Label htmlFor="settings-current-password-remove">{t('labelCurrentPassword')}</Label>
+          <Input
+            id="settings-current-password-remove"
+            type="password"
+            autoComplete="current-password"
+            value={currentPassword}
+            onChange={(event) => setCurrentPassword(event.target.value)}
+            disabled={submitting}
+          />
+        </div>
+        <Button type="submit" variant="destructive" disabled={submitting}>
+          {t('buttonRemovePassword')}
+        </Button>
+      </form>
+
+      <Dialog
+        open={confirmOpen}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setConfirmOpen(false)
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('confirmRemovePasswordTitle')}</DialogTitle>
+            <DialogDescription>{t('confirmRemovePasswordDescription')}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setConfirmOpen(false)}>
+              {t('buttonCancel')}
+            </Button>
+            <Button type="button" variant="destructive" onClick={handleConfirm}>
+              {t('buttonRemovePassword')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
+
+function mapValidationKey(code: string): TranslationKey {
+  switch (code) {
+    case PASSWORD_ERROR.PASSWORD_REQUIRED:
+      return 'errorPasswordRequired'
+    case PASSWORD_ERROR.PASSWORD_TOO_SHORT:
+      return 'errorPasswordTooShort'
+    case PASSWORD_ERROR.PASSWORD_CONFIRM_MISMATCH:
+      return 'errorPasswordConfirmMismatch'
+    default:
+      return 'validationError'
+  }
+}
+
+function mapPasswordError(error: unknown): TranslationKey {
+  const code = error instanceof Error ? error.message : ''
+  switch (code) {
+    case PASSWORD_ERROR.PASSWORD_REQUIRED:
+      return 'errorPasswordRequired'
+    case PASSWORD_ERROR.PASSWORD_TOO_SHORT:
+      return 'errorPasswordTooShort'
+    case PASSWORD_ERROR.PASSWORD_CONFIRM_MISMATCH:
+      return 'errorPasswordConfirmMismatch'
+    case PASSWORD_ERROR.PASSWORD_INVALID:
+      return 'errorPasswordInvalid'
+    case PASSWORD_ERROR.PASSWORD_ALREADY_SET:
+      return 'errorPasswordAlreadySet'
+    case PASSWORD_ERROR.PASSWORD_NOT_SET:
+      return 'errorPasswordNotSet'
+    case PASSWORD_ERROR.PASSWORD_CONFIG_INVALID:
+      return 'errorPasswordConfigInvalid'
+    default:
+      return 'validationError'
+  }
 }
 
 function RestoreConfirmationDialog({
