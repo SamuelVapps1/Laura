@@ -4,6 +4,7 @@ import { normalizeSearchText } from './search'
 export type ISODateTime = string
 export type EntityId = string
 export type NoteScope = "appointment" | "owner" | "dog"
+export type TagScope = "appointment" | "owner" | "dog"
 
 export interface Owner {
   id: EntityId
@@ -82,6 +83,24 @@ export interface EntityNote {
   _search: string
 }
 
+export interface TagDefinition {
+  id: EntityId
+  label: string
+  description: string | null
+  color: string
+  scopes: TagScope[]
+  createdAt: ISODateTime
+  updatedAt: ISODateTime
+  _search: string
+}
+
+export interface TagApplication {
+  tagId: EntityId
+  entityType: TagScope
+  entityId: EntityId
+  createdAt: ISODateTime
+}
+
 export type NewOwnerInput = {
   fullName: string
   phone?: string | null
@@ -115,6 +134,8 @@ class SalonDatabase extends Dexie {
   dogTags!: Table<DogTag, string>
   appSettings!: Table<AppSetting, string>
   notes!: Table<EntityNote, [NoteScope, string]>
+  tagDefinitions!: Table<TagDefinition, string>
+  tagApplications!: Table<TagApplication, [EntityId, TagScope, EntityId]>
 
   constructor() {
     super('salon-app-db')
@@ -153,10 +174,81 @@ class SalonDatabase extends Dexie {
         ),
       ])
     })
+    this.version(3).stores({
+      owners: 'id, fullName, phone, createdAt, updatedAt, _search',
+      dogs: 'id, ownerId, name, breed, createdAt, updatedAt, _search',
+      appointments: 'id, dogId, ownerId, startsAt, endsAt, status, createdAt, updatedAt, _search',
+      tags: 'id, name, createdAt, updatedAt, _search',
+      dogTags: 'id, dogId, tagId, [dogId+tagId]',
+      appSettings: 'key, updatedAt',
+      notes: '[scope+entityId], scope, entityId, updatedAt, _search',
+      tagDefinitions: 'id, label, updatedAt, _search, *scopes',
+      tagApplications: '[tagId+entityType+entityId], tagId, entityType, entityId, [entityType+entityId]'
+    }).upgrade(async (transaction) => {
+      const tagDefinitions = transaction.table<TagDefinition, string>('tagDefinitions')
+      const tagApplications = transaction.table<TagApplication, [EntityId, TagScope, EntityId]>('tagApplications')
+      const legacyTags = await transaction.table<Tag, string>('tags').toArray()
+      const legacyDogTags = await transaction.table<DogTag, string>('dogTags').toArray()
+
+      await Promise.all(
+        legacyTags.map(async (tag) => {
+          const existing = await tagDefinitions.get(tag.id)
+          if (existing) return
+
+          const definition: TagDefinition = {
+            id: tag.id,
+            label: tag.name,
+            description: null,
+            color: normalizeLegacyTagColor(tag.color),
+            scopes: ['dog'],
+            createdAt: tag.createdAt,
+            updatedAt: tag.updatedAt,
+            _search: normalizeSearchText([tag.name, 'dog', 'pes'].join(' ')),
+          }
+
+          await tagDefinitions.add(definition)
+        })
+      )
+
+      await Promise.all(
+        legacyDogTags.map(async (dogTag) => {
+          const key: [EntityId, TagScope, EntityId] = [dogTag.tagId, 'dog', dogTag.dogId]
+          const existing = await tagApplications.get(key)
+          if (existing) return
+
+          await tagApplications.add({
+            tagId: dogTag.tagId,
+            entityType: 'dog',
+            entityId: dogTag.dogId,
+            createdAt: dogTag.createdAt,
+          })
+        })
+      )
+    })
   }
 }
 
 export const db = new SalonDatabase()
+
+const DEFAULT_TAG_COLOR = "#3b82f6"
+const TAG_MIGRATION_COLOR_PALETTE = [
+  "#ef4444",
+  "#f97316",
+  "#f59e0b",
+  "#22c55e",
+  "#06b6d4",
+  "#3b82f6",
+  "#8b5cf6",
+  "#ec4899",
+]
+
+function normalizeLegacyTagColor(color: string | null): string {
+  if (color && TAG_MIGRATION_COLOR_PALETTE.includes(color)) {
+    return color
+  }
+
+  return DEFAULT_TAG_COLOR
+}
 
 async function migrateLegacyNote(
   notes: Table<EntityNote, [NoteScope, string]>,

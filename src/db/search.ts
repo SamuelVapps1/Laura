@@ -1,4 +1,4 @@
-import type { Owner, Dog, Appointment } from './db'
+import type { Appointment, Dog, Owner, TagDefinition, TagScope } from './db'
 
 export function normalizeSearchText(input: string | null | undefined): string {
   if (!input) return ''
@@ -49,5 +49,22 @@ export function buildAppointmentSearch(appointment: Appointment, dog: Dog, owner
     appointmentStatusSearchLabels[appointment.status],
     appointment.notes,
   ]
+  return normalizeSearchText(parts.filter(Boolean).join(' '))
+}
+
+const tagScopeSearchLabels: Record<TagScope, string> = {
+  appointment: 'termin termín appointment',
+  owner: 'majitel majiteľ owner',
+  dog: 'pes dog',
+}
+
+export function buildTagDefinitionSearch(tag: TagDefinition): string {
+  const parts = [
+    tag.label,
+    tag.description,
+    ...tag.scopes,
+    ...tag.scopes.map((scope) => tagScopeSearchLabels[scope]),
+  ]
+
   return normalizeSearchText(parts.filter(Boolean).join(' '))
 }

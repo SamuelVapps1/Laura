@@ -4,6 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 
 import { DisclosureSection } from '@/components/DisclosureSection'
 import { NotesEditor } from '@/components/NotesEditor'
+import { TagPicker } from '@/components/TagPicker'
 import { AppointmentFormDialog } from '@/components/appointments/AppointmentFormDialog'
 import { DeleteAppointmentDialog } from '@/components/appointments/DeleteAppointmentDialog'
 import { Button } from '@/components/ui/button'
@@ -39,7 +40,6 @@ type AppointmentDetail = {
 
 const placeholderCards: TranslationKey[] = [
   'appointmentPhotos',
-  'appointmentTags',
   'appointmentDogHistory',
 ]
 
@@ -153,6 +153,10 @@ export function AppointmentDetailPanel({ appointmentId, onClose }: AppointmentDe
             <div className="grid gap-3 sm:grid-cols-2">
               <DisclosureSection title={t('appointmentNotes')} openLabel={t('openNotes')}>
                 <NotesEditor scope="appointment" entityId={appointment.id} />
+              </DisclosureSection>
+
+              <DisclosureSection title={t('appointmentTags')} openLabel={t('openTags')}>
+                <TagPicker entityType="appointment" entityId={appointment.id} />
               </DisclosureSection>
 
               {placeholderCards.map((key) => (

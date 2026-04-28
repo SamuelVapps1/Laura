@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 
 import { DisclosureSection } from '@/components/DisclosureSection'
 import { NotesEditor } from '@/components/NotesEditor'
+import { TagPicker } from '@/components/TagPicker'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { db } from '@/db/db'
@@ -88,6 +89,10 @@ export function OwnerDetailPage() {
 
       <DisclosureSection title={t('ownerNotes')} openLabel={t('openNotes')}>
         <NotesEditor scope="owner" entityId={owner.id} />
+      </DisclosureSection>
+
+      <DisclosureSection title={t('ownerTags')} openLabel={t('openTags')}>
+        <TagPicker entityType="owner" entityId={owner.id} />
       </DisclosureSection>
     </div>
   )
