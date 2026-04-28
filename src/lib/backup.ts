@@ -806,6 +806,13 @@ function validateAppointment(value: unknown): asserts value is Appointment {
   if (!APPOINTMENT_STATUSES.includes(record.status as Appointment['status'])) {
     throw new BackupError('invalid_file')
   }
+
+  const tipAmount = record.tipAmount
+  if (tipAmount === undefined) {
+    record.tipAmount = null
+  } else if (tipAmount !== null && (typeof tipAmount !== 'number' || !Number.isFinite(tipAmount) || tipAmount < 0)) {
+    throw new BackupError('invalid_file')
+  }
 }
 
 function validateTag(value: unknown): asserts value is Tag {

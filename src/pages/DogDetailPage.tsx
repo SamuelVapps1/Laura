@@ -1,4 +1,5 @@
-import { Link, useParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import { Images } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 
@@ -9,10 +10,16 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { db, type Appointment } from '@/db/db'
 import { t } from '@/i18n/sk'
-import { formatAppointmentDateTime } from '@/lib/appointments'
+import {
+  formatAppointmentDateTime,
+  formatAppointmentPrice,
+  getAppointmentStatusLabel,
+} from '@/lib/appointments'
 
 export function DogDetailPage() {
   const { dogId = '' } = useParams()
+  const location = useLocation()
+  const [visibleHistoryCount, setVisibleHistoryCount] = useState(20)
 
   const dog = useLiveQuery(
     async () => dogId ? (await db.dogs.get(dogId)) ?? null : null,
@@ -30,11 +37,23 @@ export function DogDetailPage() {
     async () => {
       if (!dogId) return []
       const rows = await db.appointments.where('dogId').equals(dogId).toArray()
-      return rows.sort(sortAppointmentsByStartDesc).slice(0, 5)
+      return rows.sort(sortAppointmentsByStartDesc)
     },
     [dogId],
     []
   )
+
+  useEffect(() => {
+    if (location.hash === '#history') {
+      requestAnimationFrame(() => {
+        document.getElementById('history')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      })
+    }
+  }, [location.hash])
+
+  useEffect(() => {
+    setVisibleHistoryCount(20)
+  }, [dogId])
 
   if (dog === undefined) {
     return null
@@ -100,26 +119,49 @@ export function DogDetailPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card id="history" className="scroll-mt-6">
         <CardHeader>
-          <CardTitle className="text-base">{t('dogAppointments')}</CardTitle>
+          <CardTitle className="text-base">{t('allDogAppointments')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           {appointments.length === 0 && (
-            <p className="text-sm text-muted-foreground">{t('noDogAppointments')}</p>
+            <p className="text-sm text-muted-foreground">{t('emptyDogHistory')}</p>
           )}
-          {appointments.map((appointment) => (
+          {appointments.slice(0, visibleHistoryCount).map((appointment) => (
             <Link
               key={appointment.id}
               to={`/calendar/appt/${appointment.id}`}
               className="block rounded-md border p-3 text-sm transition-colors hover:bg-accent"
             >
-              <span className="font-medium text-gray-900">{formatAppointmentDateTime(appointment)}</span>
-              {appointment.serviceName && (
-                <span className="ml-2 text-muted-foreground">{appointment.serviceName}</span>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-medium text-gray-900">{formatAppointmentDateTime(appointment)}</span>
+                <span className="text-xs text-muted-foreground">{getAppointmentStatusLabel(appointment.status)}</span>
+              </div>
+              <p className="mt-1 text-muted-foreground">
+                {appointment.serviceName ?? t('appointmentNoService')}
+                {appointment.price !== null ? ` · ${formatAppointmentPrice(appointment.price)}` : ''}
+              </p>
+              {appointment.tipAmount !== null && appointment.tipAmount > 0 && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {t('labelTip')}: {formatAppointmentPrice(appointment.tipAmount)}
+                </p>
+              )}
+              {appointment.notes && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {appointment.notes.length > 140 ? `${appointment.notes.slice(0, 140)}...` : appointment.notes}
+                </p>
               )}
             </Link>
           ))}
+          {appointments.length > visibleHistoryCount && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setVisibleHistoryCount((previous) => previous + 20)}
+            >
+              {t('showMoreAppointments')}
+            </Button>
+          )}
         </CardContent>
       </Card>
 

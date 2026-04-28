@@ -46,6 +46,7 @@ export interface Appointment {
   status: "scheduled" | "done" | "cancelled" | "no_show"
   serviceName: string | null
   price: number | null
+  tipAmount: number | null
   paid: boolean
   cameDirty: boolean
   notes: string | null

@@ -18,6 +18,7 @@ export type NewAppointmentInput = {
   status: Appointment['status']
   serviceName?: string | null
   price?: number | null
+  tipAmount?: number | null
   paid?: boolean
   cameDirty?: boolean
   notes?: string | null
@@ -50,6 +51,7 @@ export async function createAppointment(input: NewAppointmentInput): Promise<App
       status,
       serviceName: normalizeOptionalText(input.serviceName),
       price: normalizePrice(input.price),
+      tipAmount: normalizeTipAmount(input.tipAmount),
       paid: input.paid ?? false,
       cameDirty: input.cameDirty ?? false,
       notes: normalizeOptionalText(input.notes),
@@ -101,6 +103,9 @@ export async function updateAppointment(id: EntityId, patch: UpdateAppointmentIn
         ? normalizeOptionalText(patch.serviceName)
         : existing.serviceName,
       price: patch.price !== undefined ? normalizePrice(patch.price) : existing.price,
+      tipAmount: patch.tipAmount !== undefined
+        ? normalizeTipAmount(patch.tipAmount)
+        : normalizeTipAmount(existing.tipAmount),
       paid: patch.paid ?? existing.paid,
       cameDirty: patch.cameDirty ?? existing.cameDirty,
       notes: patch.notes !== undefined ? normalizeOptionalText(patch.notes) : existing.notes,
@@ -181,6 +186,14 @@ function normalizePrice(price: number | null | undefined): number | null {
     throw new Error(DB_ERROR.INVALID_APPOINTMENT_PRICE)
   }
   return price
+}
+
+function normalizeTipAmount(value: number | null | undefined): number | null {
+  if (value === undefined || value === null) return null
+  if (!Number.isFinite(value) || value < 0) {
+    throw new Error(DB_ERROR.INVALID_APPOINTMENT_TIP)
+  }
+  return value
 }
 
 function validateStatus(status: Appointment['status']): Appointment['status'] {

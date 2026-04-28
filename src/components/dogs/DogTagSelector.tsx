@@ -25,6 +25,17 @@ export function DogTagSelector({ selectedTagIds, onChange, disabled }: DogTagSel
   )
 
   const selectedSet = useMemo(() => new Set(selectedTagIds), [selectedTagIds])
+  const sortedTags = useMemo(() => {
+    const collator = new Intl.Collator('sk')
+    return [...dogScopedTags].sort((first, second) => {
+      const firstSelected = selectedSet.has(first.id)
+      const secondSelected = selectedSet.has(second.id)
+      if (firstSelected !== secondSelected) {
+        return firstSelected ? -1 : 1
+      }
+      return collator.compare(first.label, second.label)
+    })
+  }, [dogScopedTags, selectedSet])
 
   const toggleTag = (tagId: string) => {
     if (disabled) return
@@ -53,7 +64,7 @@ export function DogTagSelector({ selectedTagIds, onChange, disabled }: DogTagSel
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap gap-2">
-        {dogScopedTags.map((tag) => {
+        {sortedTags.map((tag) => {
           const isSelected = selectedSet.has(tag.id)
           return (
             <button

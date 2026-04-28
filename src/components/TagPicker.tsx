@@ -34,6 +34,18 @@ export function TagPicker({ entityType, entityId }: TagPickerProps) {
     [applications]
   )
 
+  const sortedTagDefinitions = useMemo(() => {
+    const collator = new Intl.Collator('sk')
+    return [...tagDefinitions].sort((first, second) => {
+      const firstApplied = appliedTagIds.has(first.id)
+      const secondApplied = appliedTagIds.has(second.id)
+      if (firstApplied !== secondApplied) {
+        return firstApplied ? -1 : 1
+      }
+      return collator.compare(first.label, second.label)
+    })
+  }, [tagDefinitions, appliedTagIds])
+
   const handleToggle = async (tagId: string) => {
     setError(null)
     try {
@@ -50,7 +62,7 @@ export function TagPicker({ entityType, entityId }: TagPickerProps) {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2">
-        {tagDefinitions.map((tag) => {
+        {sortedTagDefinitions.map((tag) => {
           const isApplied = appliedTagIds.has(tag.id)
           return (
             <button
