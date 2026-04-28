@@ -248,10 +248,6 @@ export const sk = {
   confirmRemovePasswordTitle: "Odstrániť heslo?",
   confirmRemovePasswordDescription: "Aplikácia sa už nebude pri spustení zamykať. Dáta zostanú zachované.",
   appLockedInfo: "Aplikácia je uzamknutá v tomto zariadení.",
-  buttonRemoveBrokenPasswordLock: "Odstrániť poškodený zámok",
-  confirmRemoveBrokenPasswordLockTitle: "Odstrániť poškodený zámok?",
-  confirmRemoveBrokenPasswordLockDescription: "Nastavenie hesla je poškodené. Odstráni sa iba zámok aplikácie, dáta zostanú zachované.",
-  brokenPasswordLockRemoved: "Poškodený zámok bol odstránený",
 } as const
 
 export type TranslationKey = keyof typeof sk
