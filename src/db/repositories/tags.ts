@@ -156,6 +156,7 @@ export async function setTagApplicationsForEntity(
           .map((definition) => definition.id)
       )
 
+      // UI selectors are already scope-limited, so out-of-scope IDs are ignored defensively here.
       const desired = desiredUnique.filter((tagId) => allowedIds.has(tagId))
       const desiredSet = new Set(desired)
 

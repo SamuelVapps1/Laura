@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import type { Appointment } from '@/db/db'
+import type { Appointment, Dog } from '@/db/db'
 import { db } from '@/db/db'
 import { DB_ERROR } from '@/db/errors'
 import {
@@ -52,6 +52,7 @@ export function AppointmentFormDialog({
   const [ownerId, setOwnerId] = useState('')
   const [dogId, setDogId] = useState('')
   const [dogFormOpen, setDogFormOpen] = useState(false)
+  const [recentlyCreatedDog, setRecentlyCreatedDog] = useState<Dog | null>(null)
 
   const [servicePresetId, setServicePresetId] = useState<string>('small_grooming')
   const [customServiceName, setCustomServiceName] = useState('')
@@ -86,6 +87,7 @@ export function AppointmentFormDialog({
       const presetId = findServicePresetIdForStoredName(appointment.serviceName, t)
       setServicePresetId(presetId)
       setCustomServiceName(presetId === CUSTOM_SERVICE_PRESET_ID ? (appointment.serviceName ?? '') : '')
+      setRecentlyCreatedDog(null)
     } else {
       setOwnerId('')
       setDogId('')
@@ -109,6 +111,7 @@ export function AppointmentFormDialog({
       } else {
         setPrice('')
       }
+      setRecentlyCreatedDog(null)
     }
 
     setError(null)
@@ -118,8 +121,19 @@ export function AppointmentFormDialog({
     if (!open) return
     if (!ownerId) {
       setDogId('')
+      setRecentlyCreatedDog(null)
     }
   }, [open, ownerId])
+
+  useEffect(() => {
+    if (!open) {
+      setRecentlyCreatedDog(null)
+      return
+    }
+    if (recentlyCreatedDog && recentlyCreatedDog.ownerId !== ownerId) {
+      setRecentlyCreatedDog(null)
+    }
+  }, [open, ownerId, recentlyCreatedDog])
 
   useEffect(() => {
     if (!open || !ownerId || !dogId) return
@@ -131,8 +145,16 @@ export function AppointmentFormDialog({
 
   const dogsForOwner = useMemo(() => {
     if (!ownerId) return []
-    return dogs.filter((dog) => dog.ownerId === ownerId).sort((a, b) => a.name.localeCompare(b.name, 'sk'))
-  }, [dogs, ownerId])
+    const ownerDogs = dogs.filter((dog) => dog.ownerId === ownerId)
+    if (
+      recentlyCreatedDog &&
+      recentlyCreatedDog.ownerId === ownerId &&
+      !ownerDogs.some((dog) => dog.id === recentlyCreatedDog.id)
+    ) {
+      ownerDogs.push(recentlyCreatedDog)
+    }
+    return ownerDogs.sort((a, b) => a.name.localeCompare(b.name, 'sk'))
+  }, [dogs, ownerId, recentlyCreatedDog])
 
   function applyPresetFields(preset: { durationMinutes: number | null; price: number | null }) {
     if (preset.durationMinutes !== null) {
@@ -180,6 +202,7 @@ export function AppointmentFormDialog({
     }
 
     const selectedDog = dogs.find((d) => d.id === dogId)
+      ?? (recentlyCreatedDog?.id === dogId ? recentlyCreatedDog : undefined)
     if (!selectedDog) {
       setError(t('errorDogNotFound'))
       return
@@ -250,6 +273,7 @@ export function AppointmentFormDialog({
     if (!nextOpen) {
       setError(null)
       setDogFormOpen(false)
+      setRecentlyCreatedDog(null)
     }
     onOpenChange(nextOpen)
   }
@@ -410,6 +434,7 @@ export function AppointmentFormDialog({
         defaultOwnerId={ownerId || undefined}
         lockOwner
         onDogCreated={(created) => {
+          setRecentlyCreatedDog(created)
           setDogId(created.id)
           setDogFormOpen(false)
         }}

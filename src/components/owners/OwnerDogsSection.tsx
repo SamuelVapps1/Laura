@@ -95,7 +95,7 @@ export function OwnerDogsSection({ ownerId }: OwnerDogsSectionProps) {
         dog={dogDraft}
         owners={owners}
         defaultOwnerId={ownerId}
-        lockOwner={dogDraft === undefined}
+        lockOwner
       />
     </>
   )
