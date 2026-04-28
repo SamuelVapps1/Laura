@@ -5,6 +5,8 @@ export type ISODateTime = string
 export type EntityId = string
 export type NoteScope = "appointment" | "owner" | "dog"
 export type TagScope = "appointment" | "owner" | "dog"
+export type PhotoKind = "before" | "after"
+export type PhotoVariant = "full" | "thumb"
 
 export interface Owner {
   id: EntityId
@@ -101,6 +103,30 @@ export interface TagApplication {
   createdAt: ISODateTime
 }
 
+export interface PhotoSession {
+  id: EntityId
+  appointmentId: EntityId
+  dogId: EntityId
+  createdAt: ISODateTime
+  updatedAt: ISODateTime
+}
+
+export interface PhotoAsset {
+  id: EntityId
+  sessionId: EntityId
+  appointmentId: EntityId
+  dogId: EntityId
+  groupId: EntityId
+  kind: PhotoKind
+  variant: PhotoVariant
+  blob: Blob
+  mimeType: "image/webp"
+  width: number | null
+  height: number | null
+  sizeBytes: number
+  createdAt: ISODateTime
+}
+
 export type NewOwnerInput = {
   fullName: string
   phone?: string | null
@@ -136,6 +162,8 @@ class SalonDatabase extends Dexie {
   notes!: Table<EntityNote, [NoteScope, string]>
   tagDefinitions!: Table<TagDefinition, string>
   tagApplications!: Table<TagApplication, [EntityId, TagScope, EntityId]>
+  photoSessions!: Table<PhotoSession, string>
+  photos!: Table<PhotoAsset, string>
 
   constructor() {
     super('salon-app-db')
@@ -227,6 +255,19 @@ class SalonDatabase extends Dexie {
           })
         })
       )
+    })
+    this.version(4).stores({
+      owners: 'id, fullName, phone, createdAt, updatedAt, _search',
+      dogs: 'id, ownerId, name, breed, createdAt, updatedAt, _search',
+      appointments: 'id, dogId, ownerId, startsAt, endsAt, status, createdAt, updatedAt, _search',
+      tags: 'id, name, createdAt, updatedAt, _search',
+      dogTags: 'id, dogId, tagId, [dogId+tagId]',
+      appSettings: 'key, updatedAt',
+      notes: '[scope+entityId], scope, entityId, updatedAt, _search',
+      tagDefinitions: 'id, label, updatedAt, _search, *scopes',
+      tagApplications: '[tagId+entityType+entityId], tagId, entityType, entityId, [entityType+entityId]',
+      photoSessions: 'id, appointmentId, dogId, updatedAt',
+      photos: 'id, sessionId, appointmentId, dogId, groupId, kind, variant, createdAt, [sessionId+kind], [sessionId+kind+variant], [dogId+sessionId]',
     })
   }
 }

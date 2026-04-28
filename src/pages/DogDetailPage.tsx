@@ -1,4 +1,5 @@
 import { Link, useParams } from 'react-router-dom'
+import { Images } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 
 import { DisclosureSection } from '@/components/DisclosureSection'
@@ -61,9 +62,17 @@ export function DogDetailPage() {
           <h1 className="text-2xl font-bold text-gray-900">{t('dogDetail')}</h1>
           <p className="mt-2 text-gray-600">{dog.name}</p>
         </div>
-        <Button asChild variant="outline">
-          <Link to="/dogs">{t('backToDogs')}</Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline">
+            <Link to={`/dogs/${dog.id}/gallery`}>
+              <Images className="h-4 w-4" />
+              {t('openDogGallery')}
+            </Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link to="/dogs">{t('backToDogs')}</Link>
+          </Button>
+        </div>
       </div>
 
       <Card>

@@ -5,6 +5,7 @@ import { OwnersPage } from "./pages/OwnersPage"
 import { OwnerDetailPage } from "./pages/OwnerDetailPage"
 import { DogsPage } from "./pages/DogsPage"
 import { DogDetailPage } from "./pages/DogDetailPage"
+import { DogGalleryPage } from "./pages/DogGalleryPage"
 import { TagsPage } from "./pages/TagsPage"
 import { SettingsPage } from "./pages/SettingsPage"
 
@@ -36,6 +37,10 @@ const router = createBrowserRouter([
       {
         path: "dogs",
         element: <DogsPage />,
+      },
+      {
+        path: "dogs/:dogId/gallery",
+        element: <DogGalleryPage />,
       },
       {
         path: "dogs/:dogId",

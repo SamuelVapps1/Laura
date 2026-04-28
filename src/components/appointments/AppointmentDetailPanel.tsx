@@ -7,6 +7,7 @@ import { NotesEditor } from '@/components/NotesEditor'
 import { TagPicker } from '@/components/TagPicker'
 import { AppointmentFormDialog } from '@/components/appointments/AppointmentFormDialog'
 import { DeleteAppointmentDialog } from '@/components/appointments/DeleteAppointmentDialog'
+import { AppointmentPhotoSection } from '@/components/photos/AppointmentPhotoSection'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -39,7 +40,6 @@ type AppointmentDetail = {
 }
 
 const placeholderCards: TranslationKey[] = [
-  'appointmentPhotos',
   'appointmentDogHistory',
 ]
 
@@ -157,6 +157,10 @@ export function AppointmentDetailPanel({ appointmentId, onClose }: AppointmentDe
 
               <DisclosureSection title={t('appointmentTags')} openLabel={t('openTags')}>
                 <TagPicker entityType="appointment" entityId={appointment.id} />
+              </DisclosureSection>
+
+              <DisclosureSection title={t('appointmentPhotos')} openLabel={t('openPhotos')}>
+                <AppointmentPhotoSection appointmentId={appointment.id} dogId={appointment.dogId} />
               </DisclosureSection>
 
               {placeholderCards.map((key) => (
