@@ -3,8 +3,10 @@ import { useLiveQuery } from 'dexie-react-hooks'
 
 import type { TagScope } from '@/db/db'
 import { db } from '@/db/db'
+import { DB_ERROR } from '@/db/errors'
 import { toggleTagApplication } from '@/db/repositories/tags'
 import { t } from '@/i18n/sk'
+import { getReadableTagTextColor } from '@/lib/tags'
 import { cn } from '@/lib/utils'
 
 interface TagPickerProps {
@@ -36,8 +38,8 @@ export function TagPicker({ entityType, entityId }: TagPickerProps) {
     setError(null)
     try {
       await toggleTagApplication(entityType, entityId, tagId)
-    } catch {
-      setError(t('validationError'))
+    } catch (err) {
+      setError(getTagPickerError(err))
     }
   }
 
@@ -61,7 +63,7 @@ export function TagPicker({ entityType, entityId }: TagPickerProps) {
               style={{
                 backgroundColor: isApplied ? tag.color : 'transparent',
                 borderColor: tag.color,
-                color: isApplied ? '#ffffff' : tag.color,
+                color: isApplied ? getReadableTagTextColor(tag.color) : tag.color,
               }}
               onClick={() => void handleToggle(tag.id)}
             >
@@ -73,4 +75,21 @@ export function TagPicker({ entityType, entityId }: TagPickerProps) {
       {error && <p className="text-sm text-red-500">{error}</p>}
     </div>
   )
+}
+
+function getTagPickerError(error: unknown): string {
+  if (!(error instanceof Error)) return t('validationError')
+
+  switch (error.message) {
+    case DB_ERROR.TAG_DEFINITION_NOT_FOUND:
+      return t('errorTagNotFound')
+    case DB_ERROR.INVALID_TAG_SCOPE:
+      return t('errorInvalidTagScope')
+    case DB_ERROR.TAG_TARGET_NOT_FOUND:
+      return t('errorTagTargetNotFound')
+    case DB_ERROR.INVALID_TAG_COLOR:
+      return t('errorInvalidTagColor')
+    default:
+      return t('validationError')
+  }
 }

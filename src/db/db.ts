@@ -213,6 +213,9 @@ class SalonDatabase extends Dexie {
       await Promise.all(
         legacyDogTags.map(async (dogTag) => {
           const key: [EntityId, TagScope, EntityId] = [dogTag.tagId, 'dog', dogTag.dogId]
+          const tagDefinition = await tagDefinitions.get(dogTag.tagId)
+          if (!tagDefinition) return
+
           const existing = await tagApplications.get(key)
           if (existing) return
 

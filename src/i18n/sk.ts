@@ -146,6 +146,7 @@ export const sk = {
   errorTagNotFound: "Štítok nebol nájdený",
   errorInvalidTagScope: "Neplatné použitie štítku",
   errorInvalidTagColor: "Neplatná farba štítku",
+  errorTagTargetNotFound: "Cieľ štítku nebol nájdený",
   buttonApplyTag: "Pridať štítok",
   buttonRemoveTag: "Odstrániť štítok",
 } as const
