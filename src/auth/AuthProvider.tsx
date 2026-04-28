@@ -16,12 +16,18 @@ import { verifyPassword, type PasswordVerifierRecord } from '@/lib/password'
 type AuthState = {
   loading: boolean
   passwordEnabled: boolean
+  passwordConfigInvalid: boolean
   unlocked: boolean
   unlock: (password: string) => Promise<void>
   lock: () => void
   refreshPasswordState: () => Promise<void>
   markCurrentSessionUnlocked: () => void
 }
+
+type LoadedPasswordState =
+  | { kind: 'none' }
+  | { kind: 'invalid' }
+  | { kind: 'valid'; record: PasswordVerifierRecord }
 
 const AuthContext = createContext<AuthState | null>(null)
 
@@ -31,34 +37,52 @@ const AuthContext = createContext<AuthState | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [passwordEnabled, setPasswordEnabled] = useState(false)
+  const [passwordConfigInvalid, setPasswordConfigInvalid] = useState(false)
   const [unlocked, setUnlocked] = useState(false)
   const recordRef = useRef<PasswordVerifierRecord | null>(null)
+  const configInvalidRef = useRef(false)
 
-  const applyRecord = useCallback((record: PasswordVerifierRecord | null) => {
-    recordRef.current = record
-    setPasswordEnabled(record !== null)
-    if (record === null) {
-      setUnlocked(true)
+  const applyState = useCallback((state: LoadedPasswordState) => {
+    if (state.kind === 'valid') {
+      recordRef.current = state.record
+      configInvalidRef.current = false
+      setPasswordEnabled(true)
+      setPasswordConfigInvalid(false)
+      // Do not change `unlocked` here: keep current session as-is when a
+      // valid record is (re)loaded. Initial mount defaults `unlocked` to
+      // false so a fresh reload re-prompts.
+      return
     }
+
+    if (state.kind === 'invalid') {
+      // Corrupt/partial password config. Keep the gate up so private
+      // content cannot render, but never pretend this is a normal
+      // verifier. LoginPage surfaces a recovery action.
+      recordRef.current = null
+      configInvalidRef.current = true
+      setPasswordEnabled(true)
+      setPasswordConfigInvalid(true)
+      setUnlocked(false)
+      return
+    }
+
+    recordRef.current = null
+    configInvalidRef.current = false
+    setPasswordEnabled(false)
+    setPasswordConfigInvalid(false)
+    setUnlocked(true)
   }, [])
 
-  const loadRecord = useCallback(async (): Promise<PasswordVerifierRecord | null> => {
+  const loadRecord = useCallback(async (): Promise<LoadedPasswordState> => {
     try {
       const record = await getPasswordRecord()
-      return record
+      return record === null ? { kind: 'none' } : { kind: 'valid', record }
     } catch (error) {
       const code = error instanceof Error ? error.message : ''
       if (code === PASSWORD_ERROR.PASSWORD_CONFIG_INVALID) {
-        // Treat partial/corrupt config as "password enabled but unusable" so the
-        // gate stays up. UI can surface a recovery message via Settings.
-        return {
-          salt: '',
-          verifier: '',
-          iterations: 0,
-          mode: 'lock_only',
-        }
+        return { kind: 'invalid' }
       }
-      return null
+      return { kind: 'none' }
     }
   }, [])
 
@@ -66,20 +90,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false
 
     void (async () => {
-      const record = await loadRecord()
+      const state = await loadRecord()
       if (cancelled) return
-      applyRecord(record)
+      applyState(state)
       setLoading(false)
     })()
 
     return () => {
       cancelled = true
     }
-  }, [applyRecord, loadRecord])
+  }, [applyState, loadRecord])
 
   const unlock = useCallback(async (password: string) => {
+    if (configInvalidRef.current) {
+      throw new Error(PASSWORD_ERROR.PASSWORD_CONFIG_INVALID)
+    }
+
     const record = recordRef.current
-    if (!record || record.verifier === '' || record.salt === '') {
+    if (!record) {
       throw new Error(PASSWORD_ERROR.PASSWORD_INVALID)
     }
 
@@ -92,18 +120,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const lock = useCallback(() => {
-    if (recordRef.current) {
+    if (recordRef.current || configInvalidRef.current) {
       setUnlocked(false)
     }
   }, [])
 
   const refreshPasswordState = useCallback(async () => {
-    const record = await loadRecord()
-    applyRecord(record)
-  }, [applyRecord, loadRecord])
+    const state = await loadRecord()
+    applyState(state)
+  }, [applyState, loadRecord])
 
   const markCurrentSessionUnlocked = useCallback(() => {
-    if (recordRef.current) {
+    if (recordRef.current && !configInvalidRef.current) {
       setUnlocked(true)
     }
   }, [])
@@ -112,6 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       loading,
       passwordEnabled,
+      passwordConfigInvalid,
       unlocked,
       unlock,
       lock,
@@ -121,6 +150,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [
       loading,
       passwordEnabled,
+      passwordConfigInvalid,
       unlocked,
       unlock,
       lock,

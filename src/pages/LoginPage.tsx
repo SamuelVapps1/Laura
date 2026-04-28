@@ -4,9 +4,18 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/auth/AuthProvider'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { PASSWORD_ERROR } from '@/db/errors'
+import { clearPasswordSettingsWithoutVerification } from '@/db/repositories/password'
 import { t, type TranslationKey } from '@/i18n/sk'
 
 const DEFAULT_TARGET = '/calendar'
@@ -20,6 +29,8 @@ export function LoginPage() {
   const [password, setPassword] = useState('')
   const [errorKey, setErrorKey] = useState<TranslationKey | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [recoveryOpen, setRecoveryOpen] = useState(false)
+  const [isRecovering, setIsRecovering] = useState(false)
 
   const target = resolveTarget((location.state as LocationState) ?? null)
 
@@ -54,6 +65,23 @@ export function LoginPage() {
     }
   }
 
+  const handleConfirmRecovery = async () => {
+    if (isRecovering) return
+    setIsRecovering(true)
+    try {
+      await clearPasswordSettingsWithoutVerification()
+      await auth.refreshPasswordState()
+      setRecoveryOpen(false)
+      setPassword('')
+      setErrorKey(null)
+      navigate('/calendar', { replace: true })
+    } finally {
+      setIsRecovering(false)
+    }
+  }
+
+  const configInvalid = auth.passwordConfigInvalid
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12">
       <Card className="w-full max-w-sm">
@@ -63,34 +91,86 @@ export function LoginPage() {
           <CardDescription>{t('loginDescription')}</CardDescription>
         </CardHeader>
         <CardContent>
-          <form className="space-y-4" onSubmit={handleSubmit} noValidate>
-            <div className="space-y-2">
-              <Label htmlFor="login-password">{t('labelPassword')}</Label>
-              <Input
-                id="login-password"
-                type="password"
-                autoComplete="current-password"
-                autoFocus
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                disabled={isSubmitting}
-              />
-            </div>
-
-            {errorKey && (
-              <p className="rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-900">
-                {t(errorKey)}
+          {configInvalid ? (
+            <div className="space-y-4">
+              <p className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900">
+                {t('errorPasswordConfigInvalid')}
               </p>
-            )}
+              <Button
+                type="button"
+                variant="destructive"
+                className="w-full"
+                onClick={() => setRecoveryOpen(true)}
+                disabled={isRecovering}
+              >
+                {t('buttonRemoveBrokenPasswordLock')}
+              </Button>
+              <p className="text-center text-xs text-gray-500">{t('appLockedInfo')}</p>
+            </div>
+          ) : (
+            <form className="space-y-4" onSubmit={handleSubmit} noValidate>
+              <div className="space-y-2">
+                <Label htmlFor="login-password">{t('labelPassword')}</Label>
+                <Input
+                  id="login-password"
+                  type="password"
+                  autoComplete="current-password"
+                  autoFocus
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  disabled={isSubmitting}
+                />
+              </div>
 
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {t('buttonUnlock')}
-            </Button>
+              {errorKey && (
+                <p className="rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-900">
+                  {t(errorKey)}
+                </p>
+              )}
 
-            <p className="text-center text-xs text-gray-500">{t('appLockedInfo')}</p>
-          </form>
+              <Button type="submit" className="w-full" disabled={isSubmitting}>
+                {t('buttonUnlock')}
+              </Button>
+
+              <p className="text-center text-xs text-gray-500">{t('appLockedInfo')}</p>
+            </form>
+          )}
         </CardContent>
       </Card>
+
+      <Dialog
+        open={recoveryOpen}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen && !isRecovering) setRecoveryOpen(false)
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('confirmRemoveBrokenPasswordLockTitle')}</DialogTitle>
+            <DialogDescription>
+              {t('confirmRemoveBrokenPasswordLockDescription')}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setRecoveryOpen(false)}
+              disabled={isRecovering}
+            >
+              {t('buttonCancel')}
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleConfirmRecovery}
+              disabled={isRecovering}
+            >
+              {t('buttonRemoveBrokenPasswordLock')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

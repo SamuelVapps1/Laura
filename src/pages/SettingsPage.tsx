@@ -44,6 +44,7 @@ type MessageState = {
 } | null
 
 export function SettingsPage() {
+  const auth = useAuth()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [parsedBackup, setParsedBackup] = useState<ParsedBackupPreview | null>(null)
@@ -141,6 +142,13 @@ export function SettingsPage() {
       await restoreParsedBackup(parsedBackup, setProgress)
       setMessage({ key: 'backupRestoreDone', tone: 'success' })
       await refreshStorageEstimate()
+      // The restored appSettings may add or remove password keys. Refresh
+      // auth state so TopBar/Settings reflect reality without a reload, and
+      // mark the current session unlocked when a valid record now exists so
+      // the user is not kicked out mid-restore. A future reload will still
+      // re-prompt because unlock state is in-memory only.
+      await auth.refreshPasswordState()
+      auth.markCurrentSessionUnlocked()
     } catch (error) {
       setMessage({ key: getBackupErrorKey(error, 'backupRestoreError'), tone: 'error' })
       setProgress({ stage: 'error' })

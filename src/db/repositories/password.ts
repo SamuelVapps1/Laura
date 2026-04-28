@@ -122,6 +122,16 @@ export async function removePassword(currentPassword: string): Promise<void> {
   })
 }
 
+// Recovery helper for the corrupted-config flow only. The verifier or salt
+// may be missing or unparseable, so verifyPassword cannot be performed.
+// This deletes only the four password appSettings keys and never touches
+// any salon data. Do NOT call this from the normal remove-password flow.
+export async function clearPasswordSettingsWithoutVerification(): Promise<void> {
+  await db.transaction('rw', db.appSettings, async () => {
+    await db.appSettings.bulkDelete(PASSWORD_KEYS as unknown as string[])
+  })
+}
+
 async function persistPasswordRecord(record: PasswordVerifierRecord): Promise<void> {
   const updatedAt = new Date().toISOString()
   const entries: AppSetting[] = [
