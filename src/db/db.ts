@@ -1,7 +1,9 @@
 import Dexie, { Table } from 'dexie'
+import { normalizeSearchText } from './search'
 
 export type ISODateTime = string
 export type EntityId = string
+export type NoteScope = "appointment" | "owner" | "dog"
 
 export interface Owner {
   id: EntityId
@@ -71,6 +73,15 @@ export interface AppSetting {
   updatedAt: ISODateTime
 }
 
+export interface EntityNote {
+  scope: NoteScope
+  entityId: EntityId
+  text: string
+  createdAt: ISODateTime
+  updatedAt: ISODateTime
+  _search: string
+}
+
 export type NewOwnerInput = {
   fullName: string
   phone?: string | null
@@ -103,6 +114,7 @@ class SalonDatabase extends Dexie {
   tags!: Table<Tag, string>
   dogTags!: Table<DogTag, string>
   appSettings!: Table<AppSetting, string>
+  notes!: Table<EntityNote, [NoteScope, string]>
 
   constructor() {
     super('salon-app-db')
@@ -114,7 +126,59 @@ class SalonDatabase extends Dexie {
       dogTags: 'id, dogId, tagId, [dogId+tagId]',
       appSettings: 'key, updatedAt'
     })
+    this.version(2).stores({
+      owners: 'id, fullName, phone, createdAt, updatedAt, _search',
+      dogs: 'id, ownerId, name, breed, createdAt, updatedAt, _search',
+      appointments: 'id, dogId, ownerId, startsAt, endsAt, status, createdAt, updatedAt, _search',
+      tags: 'id, name, createdAt, updatedAt, _search',
+      dogTags: 'id, dogId, tagId, [dogId+tagId]',
+      appSettings: 'key, updatedAt',
+      notes: '[scope+entityId], scope, entityId, updatedAt, _search'
+    }).upgrade(async (transaction) => {
+      const notes = transaction.table<EntityNote, [NoteScope, string]>('notes')
+      const owners = await transaction.table<Owner, string>('owners').toArray()
+      const appointments = await transaction.table<Appointment, string>('appointments').toArray()
+
+      await Promise.all([
+        ...owners.map((owner) => migrateLegacyNote(notes, 'owner', owner.id, owner.notes, owner.createdAt, owner.updatedAt)),
+        ...appointments.map((appointment) =>
+          migrateLegacyNote(
+            notes,
+            'appointment',
+            appointment.id,
+            appointment.notes,
+            appointment.createdAt,
+            appointment.updatedAt
+          )
+        ),
+      ])
+    })
   }
 }
 
 export const db = new SalonDatabase()
+
+async function migrateLegacyNote(
+  notes: Table<EntityNote, [NoteScope, string]>,
+  scope: NoteScope,
+  entityId: EntityId,
+  text: string | null,
+  createdAt: ISODateTime,
+  updatedAt: ISODateTime
+): Promise<void> {
+  const normalizedText = text?.trim()
+  if (!normalizedText) return
+
+  const key: [NoteScope, string] = [scope, entityId]
+  const existing = await notes.get(key)
+  if (existing) return
+
+  await notes.add({
+    scope,
+    entityId,
+    text: normalizedText,
+    createdAt,
+    updatedAt,
+    _search: normalizeSearchText(normalizedText),
+  })
+}

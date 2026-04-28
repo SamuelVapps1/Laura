@@ -2,7 +2,9 @@ import { createBrowserRouter, RouterProvider, Navigate } from "react-router-dom"
 import { AppLayout } from "./components/layout/AppLayout"
 import { CalendarPage } from "./pages/CalendarPage"
 import { OwnersPage } from "./pages/OwnersPage"
+import { OwnerDetailPage } from "./pages/OwnerDetailPage"
 import { DogsPage } from "./pages/DogsPage"
+import { DogDetailPage } from "./pages/DogDetailPage"
 import { TagsPage } from "./pages/TagsPage"
 import { SettingsPage } from "./pages/SettingsPage"
 
@@ -28,8 +30,16 @@ const router = createBrowserRouter([
         element: <OwnersPage />,
       },
       {
+        path: "owners/:ownerId",
+        element: <OwnerDetailPage />,
+      },
+      {
         path: "dogs",
         element: <DogsPage />,
+      },
+      {
+        path: "dogs/:dogId",
+        element: <DogDetailPage />,
       },
       {
         path: "tags",

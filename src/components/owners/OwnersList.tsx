@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+
 import { t } from '@/i18n/sk'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -43,6 +45,9 @@ export function OwnersList({ owners, onEdit, onDelete }: OwnersListProps) {
                 <TableCell className="text-right">{owner.notes || '-'}</TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2">
+                    <Button asChild variant="outline" size="sm">
+                      <Link to={`/owners/${owner.id}`}>{t('buttonDetail')}</Link>
+                    </Button>
                     <Button variant="outline" size="sm" onClick={() => onEdit(owner)}>
                       {t('buttonEdit')}
                     </Button>
