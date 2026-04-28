@@ -19,7 +19,6 @@ import {
   removePassword as removePasswordRecord,
   setPassword as setPasswordRecord,
 } from '@/db/repositories/password'
-import { validatePasswordInput } from '@/lib/password'
 import {
   BACKUP_VERSION,
   BackupError,
@@ -30,6 +29,11 @@ import {
   type BackupProgress,
   type ParsedBackupPreview,
 } from '@/lib/backup'
+import {
+  validateBackupPassword,
+  type BackupPasswordValidationCode,
+} from '@/lib/backupCrypto'
+import { validatePasswordInput } from '@/lib/password'
 import { t, type TranslationKey } from '@/i18n/sk'
 
 type StorageInfo = {
@@ -53,6 +57,14 @@ export function SettingsPage() {
   const [message, setMessage] = useState<MessageState>(null)
   const [isBusy, setIsBusy] = useState(false)
   const [storageInfo, setStorageInfo] = useState<StorageInfo>({ supported: true })
+  const [exportDialogOpen, setExportDialogOpen] = useState(false)
+  const [exportPassword, setExportPassword] = useState('')
+  const [exportPasswordConfirm, setExportPasswordConfirm] = useState('')
+  const [exportFieldErrorKey, setExportFieldErrorKey] = useState<TranslationKey | null>(null)
+  const [unlockBackupOpen, setUnlockBackupOpen] = useState(false)
+  const [unlockBackupPassword, setUnlockBackupPassword] = useState('')
+  const [unlockBackupFieldErrorKey, setUnlockBackupFieldErrorKey] =
+    useState<TranslationKey | null>(null)
 
   const refreshStorageEstimate = useCallback(async () => {
     if (!navigator.storage || typeof navigator.storage.estimate !== 'function') {
@@ -76,18 +88,127 @@ export function SettingsPage() {
     void refreshStorageEstimate()
   }, [refreshStorageEstimate])
 
-  const handleExport = async () => {
+  const clearExportPasswordFields = () => {
+    setExportPassword('')
+    setExportPasswordConfirm('')
+    setExportFieldErrorKey(null)
+  }
+
+  const handleOpenExportDialog = () => {
+    clearExportPasswordFields()
+    setExportDialogOpen(true)
+  }
+
+  const handleExportDialogClosed = (open: boolean) => {
+    setExportDialogOpen(open)
+    if (!open) {
+      clearExportPasswordFields()
+    }
+  }
+
+  const handleSubmitEncryptedExport = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (isBusy) return
+
+    const violation = validateBackupPassword(exportPassword, exportPasswordConfirm)
+    if (violation) {
+      setExportFieldErrorKey(mapBackupPasswordViolation(violation))
+      return
+    }
+
+    const trimmedPassword = exportPassword.trim()
+
     setIsBusy(true)
+    setExportDialogOpen(false)
     setMessage(null)
     setProgress({ stage: 'reading' })
 
     try {
-      await exportBackup(setProgress)
+      await exportBackup(trimmedPassword, setProgress)
       setMessage({ key: 'backupExportDone', tone: 'success' })
       await refreshStorageEstimate()
-    } catch {
-      setMessage({ key: 'backupExportError', tone: 'error' })
+    } catch (error) {
+      setMessage({ key: getBackupErrorKey(error, 'backupExportError'), tone: 'error' })
       setProgress({ stage: 'error' })
+    } finally {
+      clearExportPasswordFields()
+      setIsBusy(false)
+    }
+  }
+
+  const clearUnlockBackupFields = () => {
+    setUnlockBackupPassword('')
+    setUnlockBackupFieldErrorKey(null)
+  }
+
+  const handleUnlockDialogClosed = (open: boolean) => {
+    setUnlockBackupOpen(open)
+    if (!open) {
+      clearUnlockBackupFields()
+    }
+  }
+
+  const handleParseSelectedFile = async () => {
+    if (!selectedFile) return
+    await runBackupParse(undefined)
+  }
+
+  const handleSubmitUnlockEncryptedBackup = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (isBusy || !selectedFile) return
+
+    setUnlockBackupFieldErrorKey(null)
+
+    const trimmed = unlockBackupPassword.trim()
+    if (trimmed.length === 0) {
+      setUnlockBackupFieldErrorKey('encryptedBackupPasswordRequired')
+      return
+    }
+
+    await runBackupParse(trimmed)
+  }
+
+  const resetSelectedFile = () => {
+    setSelectedFile(null)
+    clearUnlockBackupFields()
+    setUnlockBackupOpen(false)
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
+  const runBackupParse = async (backupPassword?: string) => {
+    if (!selectedFile) return
+
+    setIsBusy(true)
+    setMessage(null)
+    setUnlockBackupFieldErrorKey(null)
+    setProgress({ stage: 'parsing' })
+
+    try {
+      const parsed = await parseBackupFile(selectedFile, backupPassword)
+      clearUnlockBackupFields()
+      setUnlockBackupOpen(false)
+      setParsedBackup(parsed)
+      setIsConfirmOpen(true)
+      setProgress(null)
+    } catch (error) {
+      if (error instanceof BackupError && error.code === 'encrypted_backup_password_required') {
+        setProgress(null)
+        setUnlockBackupOpen(true)
+        return
+      }
+
+      if (error instanceof BackupError && error.code === 'encrypted_backup_wrong_password') {
+        setProgress(null)
+        setUnlockBackupFieldErrorKey('encryptedBackupWrongPassword')
+        return
+      }
+
+      setMessage({ key: getBackupErrorKey(error, 'backupInvalidFile'), tone: 'error' })
+      setProgress({ stage: 'error' })
+      resetSelectedFile()
     } finally {
       setIsBusy(false)
     }
@@ -101,26 +222,9 @@ export function SettingsPage() {
     setIsConfirmOpen(false)
     setMessage(null)
     setProgress(null)
-  }
-
-  const handleParseSelectedFile = async () => {
-    if (!selectedFile) return
-
-    setIsBusy(true)
-    setMessage(null)
-    setProgress({ stage: 'parsing' })
-
-    try {
-      const parsed = await parseBackupFile(selectedFile)
-      setParsedBackup(parsed)
-      setIsConfirmOpen(true)
-      setProgress(null)
-    } catch (error) {
-      setMessage({ key: getBackupErrorKey(error, 'backupInvalidFile'), tone: 'error' })
-      setProgress({ stage: 'error' })
-      resetSelectedFile()
-    } finally {
-      setIsBusy(false)
+    if (!file) {
+      clearUnlockBackupFields()
+      setUnlockBackupOpen(false)
     }
   }
 
@@ -159,14 +263,6 @@ export function SettingsPage() {
     }
   }
 
-  const resetSelectedFile = () => {
-    setSelectedFile(null)
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ''
-    }
-  }
-
   const statusText = message ? t(message.key) : getProgressText(progress)
 
   return (
@@ -183,8 +279,8 @@ export function SettingsPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-col gap-3 sm:flex-row">
-            <Button onClick={handleExport} disabled={isBusy}>
-              {t('downloadBackup')}
+            <Button type="button" onClick={handleOpenExportDialog} disabled={isBusy}>
+              {t('downloadEncryptedBackup')}
             </Button>
           </div>
 
@@ -246,6 +342,100 @@ export function SettingsPage() {
           <p>{t('aboutOfflineFirst')}</p>
         </CardContent>
       </Card>
+
+      <Dialog open={exportDialogOpen} onOpenChange={handleExportDialogClosed}>
+        <DialogContent>
+          <form onSubmit={handleSubmitEncryptedExport} className="space-y-4" noValidate>
+            <DialogHeader>
+              <DialogTitle>{t('encryptedBackupTitle')}</DialogTitle>
+              <DialogDescription>{t('encryptedBackupDescription')}</DialogDescription>
+            </DialogHeader>
+
+            <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+              {t('backupPasswordWarning')}
+            </p>
+            <p className="text-sm text-gray-600">{t('backupCannotBeRecovered')}</p>
+            <p className="text-xs text-gray-500">{t('passwordLockOnlyNotice')}</p>
+
+            <div className="space-y-2">
+              <Label htmlFor="export-backup-password">{t('backupPasswordLabel')}</Label>
+              <Input
+                id="export-backup-password"
+                type="password"
+                autoComplete="new-password"
+                value={exportPassword}
+                onChange={(event) => setExportPassword(event.target.value)}
+                disabled={isBusy}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="export-backup-password-confirm">{t('backupPasswordConfirmLabel')}</Label>
+              <Input
+                id="export-backup-password-confirm"
+                type="password"
+                autoComplete="new-password"
+                value={exportPasswordConfirm}
+                onChange={(event) => setExportPasswordConfirm(event.target.value)}
+                disabled={isBusy}
+              />
+            </div>
+
+            {exportFieldErrorKey && (
+              <p className="text-sm text-red-700">{t(exportFieldErrorKey)}</p>
+            )}
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleExportDialogClosed(false)}
+                disabled={isBusy}
+              >
+                {t('buttonCancel')}
+              </Button>
+              <Button type="submit" disabled={isBusy}>
+                {t('createEncryptedBackup')}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={unlockBackupOpen} onOpenChange={handleUnlockDialogClosed}>
+        <DialogContent>
+          <form onSubmit={handleSubmitUnlockEncryptedBackup} className="space-y-4" noValidate>
+            <DialogHeader>
+              <DialogTitle>{t('encryptedBackupTitle')}</DialogTitle>
+              <DialogDescription>{t('encryptedBackupDetected')}</DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-2">
+              <Label htmlFor="unlock-backup-password">{t('backupPasswordLabel')}</Label>
+              <Input
+                id="unlock-backup-password"
+                type="password"
+                autoComplete="off"
+                value={unlockBackupPassword}
+                onChange={(event) => setUnlockBackupPassword(event.target.value)}
+                disabled={isBusy}
+              />
+            </div>
+
+            {unlockBackupFieldErrorKey && (
+              <p className="text-sm text-red-700">{t(unlockBackupFieldErrorKey)}</p>
+            )}
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => handleUnlockDialogClosed(false)} disabled={isBusy}>
+                {t('buttonCancel')}
+              </Button>
+              <Button type="submit" disabled={isBusy}>
+                {t('unlockEncryptedBackup')}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <RestoreConfirmationDialog
         open={isConfirmOpen}
@@ -610,6 +800,12 @@ function RestoreConfirmationDialog({
 
         {counts && (
           <div className="space-y-4">
+            {parsedBackup?.plainBackupNotEncrypted === true && (
+              <p className="rounded-md border border-yellow-300 bg-yellow-50 p-3 text-sm text-yellow-900">
+                {t('plainBackupNotEncryptedWarning')}
+              </p>
+            )}
+
             <p className="rounded-md border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-900">
               {t('backupCurrentDataWillBeReplaced')}
             </p>
@@ -700,12 +896,27 @@ function getProgressText(progress: BackupProgress | null): string | null {
     case 'packing':
     case 'downloading':
       return t('backupExporting')
+    case 'encrypting':
+      return t('backupExportingEncrypted')
     case 'parsing':
       return t('backupParsing')
     case 'restoring':
       return t('backupRestoreProgress')
     default:
       return null
+  }
+}
+
+function mapBackupPasswordViolation(code: BackupPasswordValidationCode): TranslationKey {
+  switch (code) {
+    case 'BACKUP_PASSWORD_REQUIRED':
+      return 'encryptedBackupPasswordRequired'
+    case 'BACKUP_PASSWORD_TOO_SHORT':
+      return 'backupPasswordTooShort'
+    case 'BACKUP_PASSWORD_CONFIRM_MISMATCH':
+      return 'backupPasswordConfirmMismatch'
+    default:
+      return 'validationError'
   }
 }
 
@@ -723,12 +934,24 @@ function getRestoreCountRows(counts: BackupCounts): { label: string; value: numb
 
 function getBackupErrorKey(error: unknown, fallback: TranslationKey): TranslationKey {
   if (error instanceof BackupError) {
-    if (error.code === 'unsupported_version') {
-      return 'backupUnsupportedVersion'
-    }
-
-    if (error.code === 'invalid_file') {
-      return 'backupInvalidFile'
+    switch (error.code) {
+      case 'unsupported_version':
+        return 'backupUnsupportedVersion'
+      case 'backup_password_required':
+      case 'encrypted_backup_password_required':
+        return 'encryptedBackupPasswordRequired'
+      case 'backup_password_too_short':
+        return 'backupPasswordTooShort'
+      case 'backup_password_confirm_mismatch':
+        return 'backupPasswordConfirmMismatch'
+      case 'encrypted_backup_wrong_password':
+        return 'encryptedBackupWrongPassword'
+      case 'encrypted_backup_invalid':
+        return 'encryptedBackupInvalid'
+      case 'invalid_file':
+        return 'backupInvalidFile'
+      default:
+        return fallback
     }
   }
 

@@ -1,5 +1,17 @@
 import { strFromU8, strToU8, unzipSync, zipSync, type Zippable } from 'fflate'
 
+import {
+  bytesToBase64,
+  base64ToBytes,
+  decryptBackupPayload,
+  encryptBackupPayload,
+  EncryptedBackupDecryptError,
+  ENCRYPTED_BACKUP_FORMAT,
+  ENCRYPTED_BACKUP_VERSION,
+  isEncryptedBackupManifest,
+  validateBackupPassword,
+  type EncryptedBackupManifest,
+} from '@/lib/backupCrypto'
 import { db, type AppSetting, type Appointment, type Dog, type DogTag, type EntityId, type EntityNote, type ISODateTime, type Owner, type PhotoAsset, type PhotoKind, type PhotoSession, type PhotoVariant, type Tag, type TagApplication, type TagDefinition, type TagScope } from '@/db/db'
 import { LAST_BACKUP_AT_KEY, setLastBackupAt } from '@/db/repositories/settings'
 
@@ -11,6 +23,7 @@ export type BackupProgressStage =
   | 'reading'
   | 'preparing'
   | 'packing'
+  | 'encrypting'
   | 'downloading'
   | 'parsing'
   | 'restoring'
@@ -82,9 +95,20 @@ export type ParsedBackupPreview = {
   photoFiles: Map<string, Uint8Array>
   counts: BackupCounts
   warnings: string[]
+  /** Plain (legacy) unencrypted ZIP from older exports — optional UI notice only. */
+  plainBackupNotEncrypted?: boolean
 }
 
-export type BackupErrorCode = 'invalid_file' | 'unsupported_version' | 'restore_failed'
+export type BackupErrorCode =
+  | 'invalid_file'
+  | 'unsupported_version'
+  | 'restore_failed'
+  | 'backup_password_required'
+  | 'backup_password_too_short'
+  | 'backup_password_confirm_mismatch'
+  | 'encrypted_backup_password_required'
+  | 'encrypted_backup_wrong_password'
+  | 'encrypted_backup_invalid'
 
 export class BackupError extends Error {
   code: BackupErrorCode
@@ -137,75 +161,145 @@ type BackupSnapshot = Omit<BackupData, 'photos'> & {
   photos: PhotoAsset[]
 }
 
-export async function exportBackup(onProgress?: (progress: BackupProgress) => void): Promise<void> {
+export type ExportBackupOptions = {
+  password: string
+}
+
+function assertBackupPasswordForExport(password: string): string {
+  const violation = validateBackupPassword(password)
+  if (!violation) {
+    return password.trim()
+  }
+  switch (violation) {
+    case 'BACKUP_PASSWORD_REQUIRED':
+      throw new BackupError('backup_password_required')
+    case 'BACKUP_PASSWORD_TOO_SHORT':
+      throw new BackupError('backup_password_too_short')
+    case 'BACKUP_PASSWORD_CONFIRM_MISMATCH':
+      throw new BackupError('backup_password_confirm_mismatch')
+    default:
+      throw new BackupError('invalid_file')
+  }
+}
+
+/** Encrypted export is the default. Pass a backup password (min 12 characters). Optional progress callback second. */
+export async function exportBackup(
+  password: string | ExportBackupOptions,
+  onProgress?: (progress: BackupProgress) => void
+): Promise<void> {
   try {
+    const rawPassword =
+      typeof password === 'string'
+        ? password
+        : password.password
+
+    const trimmedPassword = assertBackupPasswordForExport(rawPassword)
+
     reportProgress(onProgress, { stage: 'reading' })
-    const snapshot = await readBackupSnapshot()
-    const data: BackupData = {
-      owners: snapshot.owners,
-      dogs: snapshot.dogs,
-      appointments: snapshot.appointments,
-      tags: snapshot.tags,
-      dogTags: snapshot.dogTags,
-      appSettings: snapshot.appSettings,
-      notes: snapshot.notes,
-      tagDefinitions: snapshot.tagDefinitions,
-      tagApplications: snapshot.tagApplications,
-      photoSessions: snapshot.photoSessions,
-      photos: [],
-    }
-    const zipEntries: Zippable = {}
+    const plainZipBytes = await buildPlainBackupZip(onProgress)
 
-    reportProgress(onProgress, {
-      stage: 'preparing',
-      current: 0,
-      total: snapshot.photos.length,
-    })
+    reportProgress(onProgress, { stage: 'encrypting' })
+    const { ciphertext, salt, iv } = await encryptBackupPayload(plainZipBytes, trimmedPassword)
 
-    for (let index = 0; index < snapshot.photos.length; index += 1) {
-      const photo = snapshot.photos[index]
-      const record = toPhotoBackupRecord(photo)
-      const bytes = new Uint8Array(await photo.blob.arrayBuffer())
-
-      data.photos.push(record)
-      zipEntries[record.filePath] = [bytes, { level: 0 }]
-
-      if (shouldReportPhotoProgress(index, snapshot.photos.length)) {
-        reportProgress(onProgress, {
-          stage: 'preparing',
-          current: index + 1,
-          total: snapshot.photos.length,
-        })
-      }
-    }
-
-    const manifest: BackupManifest = {
-      format: BACKUP_FORMAT,
-      version: BACKUP_VERSION,
-      createdAt: new Date().toISOString(),
+    const createdAt = new Date().toISOString()
+    const encryptedManifest: EncryptedBackupManifest = {
+      format: ENCRYPTED_BACKUP_FORMAT,
+      version: ENCRYPTED_BACKUP_VERSION,
+      createdAt,
       appName: APP_NAME,
-      counts: createCounts(data),
+      encryption: {
+        algorithm: 'AES-GCM',
+        kdf: 'PBKDF2-SHA256',
+        iterations: 250000,
+        salt: bytesToBase64(salt),
+        iv: bytesToBase64(iv),
+        keyLengthBits: 256,
+      },
+      payload: {
+        file: 'payload.bin',
+        byteLength: ciphertext.byteLength,
+      },
     }
 
-    zipEntries['manifest.json'] = strToU8(JSON.stringify(manifest, null, 2))
-    zipEntries['data.json'] = strToU8(JSON.stringify(data, null, 2))
+    const outerZip: Zippable = {
+      'manifest.json': strToU8(JSON.stringify(encryptedManifest, null, 2)),
+      'payload.bin': [ciphertext, { level: 0 }],
+    }
 
     reportProgress(onProgress, { stage: 'packing' })
-    const zipBytes = zipSync(zipEntries, { level: 6 })
+    const outerBytes = zipSync(outerZip, { level: 6 })
 
     reportProgress(onProgress, { stage: 'downloading' })
-    const zipBlob = new Blob([toArrayBuffer(zipBytes)], { type: 'application/zip' })
-    triggerDownload(zipBlob, buildBackupFilename(new Date()))
+    const blob = new Blob([toArrayBuffer(outerBytes)], { type: 'application/zip' })
+    triggerDownload(blob, buildEncryptedBackupFilename(new Date()))
 
     await setLastBackupAt(new Date().toISOString())
     reportProgress(onProgress, { stage: 'done' })
   } catch (error) {
     reportProgress(onProgress, { stage: 'error' })
+    if (error instanceof BackupError) {
+      throw error
+    }
     throw error
   }
 }
 
-export async function parseBackupFile(file: File): Promise<ParsedBackupPreview> {
+async function buildPlainBackupZip(onProgress?: (progress: BackupProgress) => void): Promise<Uint8Array> {
+  const snapshot = await readBackupSnapshot()
+  const data: BackupData = {
+    owners: snapshot.owners,
+    dogs: snapshot.dogs,
+    appointments: snapshot.appointments,
+    tags: snapshot.tags,
+    dogTags: snapshot.dogTags,
+    appSettings: snapshot.appSettings,
+    notes: snapshot.notes,
+    tagDefinitions: snapshot.tagDefinitions,
+    tagApplications: snapshot.tagApplications,
+    photoSessions: snapshot.photoSessions,
+    photos: [],
+  }
+  const zipEntries: Zippable = {}
+
+  reportProgress(onProgress, {
+    stage: 'preparing',
+    current: 0,
+    total: snapshot.photos.length,
+  })
+
+  for (let index = 0; index < snapshot.photos.length; index += 1) {
+    const photo = snapshot.photos[index]
+    const record = toPhotoBackupRecord(photo)
+    const bytes = new Uint8Array(await photo.blob.arrayBuffer())
+
+    data.photos.push(record)
+    zipEntries[record.filePath] = [bytes, { level: 0 }]
+
+    if (shouldReportPhotoProgress(index, snapshot.photos.length)) {
+      reportProgress(onProgress, {
+        stage: 'preparing',
+        current: index + 1,
+        total: snapshot.photos.length,
+      })
+    }
+  }
+
+  const manifest: BackupManifest = {
+    format: BACKUP_FORMAT,
+    version: BACKUP_VERSION,
+    createdAt: new Date().toISOString(),
+    appName: APP_NAME,
+    counts: createCounts(data),
+  }
+
+  zipEntries['manifest.json'] = strToU8(JSON.stringify(manifest, null, 2))
+  zipEntries['data.json'] = strToU8(JSON.stringify(data, null, 2))
+
+  reportProgress(onProgress, { stage: 'packing' })
+  return zipSync(zipEntries, { level: 6 })
+}
+
+export async function parseBackupFile(file: File, password?: string): Promise<ParsedBackupPreview> {
   if (!isZipLikeFile(file)) {
     throw new BackupError('invalid_file')
   }
@@ -219,9 +313,34 @@ export async function parseBackupFile(file: File): Promise<ParsedBackupPreview> 
   }
 
   const manifestBytes = unzipped['manifest.json']
+
+  if (!manifestBytes) {
+    throw new BackupError('invalid_file')
+  }
+
+  const manifestPeek = parseJsonFile(manifestBytes)
+
+  if (isEncryptedBackupManifest(manifestPeek)) {
+    return parseEncryptedOuterBackup(unzipped, manifestPeek, password)
+  }
+
+  const preview = parsePlainBackupFromUnzipped(unzipped)
+  return {
+    ...preview,
+    plainBackupNotEncrypted: true,
+  }
+}
+
+function parsePlainBackupFromUnzipped(unzipped: Record<string, Uint8Array>): ParsedBackupPreview {
   const dataBytes = unzipped['data.json']
 
-  if (!manifestBytes || !dataBytes) {
+  if (!dataBytes) {
+    throw new BackupError('invalid_file')
+  }
+
+  const manifestBytes = unzipped['manifest.json']
+
+  if (!manifestBytes) {
     throw new BackupError('invalid_file')
   }
 
@@ -238,6 +357,82 @@ export async function parseBackupFile(file: File): Promise<ParsedBackupPreview> 
     photoFiles,
     counts,
     warnings: buildWarnings(manifest, counts),
+  }
+}
+
+async function parseEncryptedOuterBackup(
+  unzipped: Record<string, Uint8Array>,
+  manifest: EncryptedBackupManifest,
+  password: string | undefined
+): Promise<ParsedBackupPreview> {
+  const trimmed = password?.trim() ?? ''
+  if (!trimmed) {
+    throw new BackupError('encrypted_backup_password_required')
+  }
+
+  const payloadBytes = unzipped['payload.bin']
+
+  if (!payloadBytes || payloadBytes.byteLength === 0) {
+    throw new BackupError('encrypted_backup_invalid')
+  }
+
+  if (payloadBytes.byteLength !== manifest.payload.byteLength) {
+    throw new BackupError('encrypted_backup_invalid')
+  }
+
+  let salt: Uint8Array
+  let iv: Uint8Array
+
+  try {
+    salt = base64ToBytes(manifest.encryption.salt)
+    iv = base64ToBytes(manifest.encryption.iv)
+  } catch {
+    throw new BackupError('encrypted_backup_invalid')
+  }
+
+  if (salt.byteLength !== 16 || iv.byteLength !== 12) {
+    throw new BackupError('encrypted_backup_invalid')
+  }
+
+  let plainZipBytes: Uint8Array
+
+  try {
+    plainZipBytes = await decryptBackupPayload(
+      {
+        ciphertext: payloadBytes,
+        salt,
+        iv,
+      },
+      trimmed
+    )
+  } catch (error) {
+    if (error instanceof EncryptedBackupDecryptError) {
+      throw new BackupError('encrypted_backup_wrong_password')
+    }
+
+    throw new BackupError('encrypted_backup_invalid')
+  }
+
+  let innerUnzipped: Record<string, Uint8Array>
+
+  try {
+    innerUnzipped = unzipSync(plainZipBytes)
+  } catch {
+    throw new BackupError('encrypted_backup_invalid')
+  }
+
+  try {
+    return parsePlainBackupFromUnzipped(innerUnzipped)
+  } catch (error) {
+    if (error instanceof BackupError && error.code === 'unsupported_version') {
+      throw error
+    }
+
+    if (error instanceof BackupError) {
+      throw new BackupError('encrypted_backup_invalid')
+    }
+
+    throw error
   }
 }
 
@@ -777,14 +972,14 @@ function isZipLikeFile(file: File): boolean {
   return name.endsWith('.zip') || type === 'application/zip' || type === 'application/x-zip-compressed'
 }
 
-function buildBackupFilename(date: Date): string {
+function buildEncryptedBackupFilename(date: Date): string {
   const year = date.getFullYear()
   const month = padDatePart(date.getMonth() + 1)
   const day = padDatePart(date.getDate())
   const hour = padDatePart(date.getHours())
   const minute = padDatePart(date.getMinutes())
 
-  return `salon-zaloha-${year}-${month}-${day}_${hour}-${minute}.zip`
+  return `salon-zaloha-sifrovana-${year}-${month}-${day}_${hour}-${minute}.zip`
 }
 
 function triggerDownload(blob: Blob, filename: string): void {
