@@ -54,6 +54,8 @@ export function CalendarPage() {
     if (dateParam && monthParam) return
 
     const startsAt = new Date(linkedAppointment.startsAt)
+    if (!isValidDate(startsAt)) return
+
     const nextParams = new URLSearchParams(searchParams)
 
     if (!dateParam) {
@@ -68,11 +70,20 @@ export function CalendarPage() {
   }, [appointmentId, dateParam, linkedAppointment, monthParam, searchParams, setSearchParams])
 
   const bookedDates = useMemo(() => {
-    const bookedDateKeys = new Set(
-      monthAppointments.map((appointment) => toDateInputValue(new Date(appointment.startsAt)))
-    )
+    const bookedDateKeys = new Set<string>()
 
-    return Array.from(bookedDateKeys).map(parseRequiredDate)
+    monthAppointments.forEach((appointment) => {
+      const startsAt = new Date(appointment.startsAt)
+
+      if (isValidDate(startsAt)) {
+        bookedDateKeys.add(toDateInputValue(startsAt))
+      }
+    })
+
+    return Array.from(bookedDateKeys).flatMap((dateKey) => {
+      const parsedDate = parseDate(dateKey)
+      return parsedDate ? [parsedDate] : []
+    })
   }, [monthAppointments])
 
   const handleSelectDate = (date?: Date) => {
@@ -98,15 +109,24 @@ export function CalendarPage() {
     })
   }
 
-  const handleCloseDetail = () => {
+  const handleCloseDetail = (options: { preserveParams?: boolean } = {}) => {
+    if (options.preserveParams === false) {
+      navigate('/calendar')
+      return
+    }
+
     const nextParams = new URLSearchParams(searchParams)
+    const linkedAppointmentDate = linkedAppointment ? new Date(linkedAppointment.startsAt) : null
+    const fallbackDate = linkedAppointmentDate && isValidDate(linkedAppointmentDate)
+      ? linkedAppointmentDate
+      : selectedDate
 
     if (!nextParams.get('date')) {
-      nextParams.set('date', toDateInputValue(selectedDate))
+      nextParams.set('date', toDateInputValue(fallbackDate))
     }
 
     if (!nextParams.get('month')) {
-      nextParams.set('month', toMonthInputValue(visibleMonth))
+      nextParams.set('month', toMonthInputValue(fallbackDate))
     }
 
     const search = nextParams.toString()
@@ -129,8 +149,8 @@ export function CalendarPage() {
         </Button>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[360px_minmax(0,1fr)]">
-        <section className="rounded-lg border bg-card p-4 shadow-sm">
+      <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
+        <section className="min-w-0 overflow-hidden rounded-lg border bg-card p-3 shadow-sm sm:p-4">
           <DayPicker
             mode="single"
             selected={selectedDate}
@@ -144,22 +164,22 @@ export function CalendarPage() {
             modifiers={{ booked: bookedDates }}
             components={{ DayButton: CalendarDayButton }}
             classNames={{
-              [UI.Root]: "w-full",
-              [UI.Months]: "relative",
+              [UI.Root]: "w-full max-w-full",
+              [UI.Months]: "relative w-full max-w-full",
               [UI.Month]: "space-y-4",
               [UI.MonthCaption]: "flex h-10 items-center justify-center",
               [UI.CaptionLabel]: "text-base font-semibold text-gray-900",
-              [UI.Nav]: "absolute right-4 top-4 flex items-center gap-1",
+              [UI.Nav]: "absolute right-0 top-1 flex items-center gap-1 sm:right-1",
               [UI.PreviousMonthButton]: "inline-flex h-8 w-8 items-center justify-center rounded-md border border-input bg-background text-sm hover:bg-accent disabled:opacity-40",
               [UI.NextMonthButton]: "inline-flex h-8 w-8 items-center justify-center rounded-md border border-input bg-background text-sm hover:bg-accent disabled:opacity-40",
               [UI.Chevron]: "h-4 w-4",
-              [UI.MonthGrid]: "w-full border-collapse",
+              [UI.MonthGrid]: "w-full table-fixed border-collapse",
               [UI.Weekdays]: "grid grid-cols-7",
               [UI.Weekday]: "py-2 text-center text-xs font-medium text-muted-foreground",
               [UI.Weeks]: "block",
               [UI.Week]: "grid grid-cols-7",
-              [UI.Day]: "flex h-11 items-center justify-center p-0",
-              [UI.DayButton]: "relative flex h-10 w-10 items-center justify-center rounded-md text-sm transition-colors hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+              [UI.Day]: "flex aspect-square min-w-0 items-center justify-center p-0",
+              [UI.DayButton]: "relative flex h-9 w-9 items-center justify-center rounded-md text-sm transition-colors hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 sm:h-10 sm:w-10",
               [DayFlag.outside]: "text-muted-foreground opacity-40",
               [DayFlag.today]: "font-semibold text-primary",
               [SelectionState.selected]: "text-primary-foreground",
@@ -229,10 +249,6 @@ function parseMonthParam(value: string | null): Date | null {
   return parseDate(`${value}-01`)
 }
 
-function parseRequiredDate(value: string): Date {
-  return parseDate(value) ?? new Date()
-}
-
 function parseDate(value: string): Date | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
   if (!match) return null
@@ -251,4 +267,8 @@ function parseDate(value: string): Date | null {
   }
 
   return parsed
+}
+
+function isValidDate(date: Date): boolean {
+  return !Number.isNaN(date.getTime())
 }

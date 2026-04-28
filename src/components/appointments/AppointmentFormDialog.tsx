@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
 import type { Appointment } from '@/db/db'
 import { db } from '@/db/db'
 import { DB_ERROR } from '@/db/errors'
@@ -252,7 +253,7 @@ export function AppointmentFormDialog({
 
             <div className="grid gap-2">
               <Label htmlFor="appointment-notes">{t('labelNotes')}</Label>
-              <Input
+              <Textarea
                 id="appointment-notes"
                 value={notes}
                 onChange={(event) => setNotes(event.target.value)}

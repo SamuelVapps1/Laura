@@ -25,7 +25,7 @@ import {
 
 interface AppointmentDetailPanelProps {
   appointmentId?: string
-  onClose: () => void
+  onClose: (options?: { preserveParams?: boolean }) => void
 }
 
 type AppointmentDetail = {
@@ -81,7 +81,7 @@ export function AppointmentDetailPanel({ appointmentId, onClose }: AppointmentDe
       open={!!appointmentId}
       onOpenChange={(nextOpen) => {
         if (!nextOpen) {
-          onClose()
+          onClose({ preserveParams: !detail.loaded || !!appointment })
         }
       }}
     >
@@ -99,7 +99,7 @@ export function AppointmentDetailPanel({ appointmentId, onClose }: AppointmentDe
               <SheetDescription>{t('errorAppointmentNotFound')}</SheetDescription>
             </SheetHeader>
             <SheetFooter className="mt-6">
-              <Button type="button" variant="outline" onClick={onClose}>
+              <Button type="button" variant="outline" onClick={() => onClose({ preserveParams: false })}>
                 <X className="h-4 w-4" />
                 {t('buttonClose')}
               </Button>
@@ -143,7 +143,7 @@ export function AppointmentDetailPanel({ appointmentId, onClose }: AppointmentDe
                 <Trash2 className="h-4 w-4" />
                 {t('buttonDelete')}
               </Button>
-              <Button type="button" variant="ghost" onClick={onClose}>
+              <Button type="button" variant="ghost" onClick={() => onClose()}>
                 <X className="h-4 w-4" />
                 {t('buttonClose')}
               </Button>
