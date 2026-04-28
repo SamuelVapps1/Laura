@@ -133,6 +133,53 @@ export async function getTagApplicationsForEntity(
   return db.tagApplications.where('[entityType+entityId]').equals([entityType, entityId]).toArray()
 }
 
+/** Replace entity tag applications to exactly match allowed `selectedTagIds` (definitions must include scope). */
+export async function setTagApplicationsForEntity(
+  entityType: TagScope,
+  entityId: EntityId,
+  selectedTagIds: EntityId[]
+): Promise<void> {
+  validateScope(entityType)
+
+  const desiredUnique = Array.from(new Set(selectedTagIds))
+
+  return db.transaction(
+    'rw',
+    [db.tagDefinitions, db.tagApplications, db.appointments, db.owners, db.dogs],
+    async () => {
+      await validateTargetExists(entityType, entityId)
+
+      const definitions = await db.tagDefinitions.toArray()
+      const allowedIds = new Set(
+        definitions
+          .filter((definition) => definition.scopes.includes(entityType))
+          .map((definition) => definition.id)
+      )
+
+      const desired = desiredUnique.filter((tagId) => allowedIds.has(tagId))
+      const desiredSet = new Set(desired)
+
+      const existing = await db.tagApplications
+        .where('[entityType+entityId]')
+        .equals([entityType, entityId])
+        .toArray()
+
+      for (const application of existing) {
+        if (!desiredSet.has(application.tagId)) {
+          await db.tagApplications.delete(getApplicationKey(application.tagId, entityType, entityId))
+        }
+      }
+
+      const existingIds = new Set(existing.map((application) => application.tagId))
+      for (const tagId of desired) {
+        if (!existingIds.has(tagId)) {
+          await applyTagInsideTransaction(entityType, entityId, tagId)
+        }
+      }
+    }
+  )
+}
+
 function normalizeLabel(label: string): string {
   const normalized = label.trim()
   if (!normalized) {

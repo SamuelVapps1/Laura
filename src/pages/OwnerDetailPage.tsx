@@ -1,8 +1,10 @@
-import { Link, useParams } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 
 import { DisclosureSection } from '@/components/DisclosureSection'
 import { NotesEditor } from '@/components/NotesEditor'
+import { OwnerDogsSection } from '@/components/owners/OwnerDogsSection'
 import { TagPicker } from '@/components/TagPicker'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -11,18 +13,20 @@ import { t } from '@/i18n/sk'
 
 export function OwnerDetailPage() {
   const { ownerId = '' } = useParams()
+  const location = useLocation()
 
   const owner = useLiveQuery(
-    async () => ownerId ? (await db.owners.get(ownerId)) ?? null : null,
+    async () => (ownerId ? ((await db.owners.get(ownerId)) ?? null) : null),
     [ownerId],
     undefined
   )
 
-  const dogs = useLiveQuery(
-    async () => ownerId ? db.dogs.where('ownerId').equals(ownerId).sortBy('name') : [],
-    [ownerId],
-    []
-  )
+  useEffect(() => {
+    if (!owner?.id || location.hash !== '#dogs') return
+    requestAnimationFrame(() => {
+      document.getElementById('dogs')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }, [location.hash, owner])
 
   if (owner === undefined) {
     return null
@@ -35,9 +39,7 @@ export function OwnerDetailPage() {
           <Link to="/owners">{t('backToOwners')}</Link>
         </Button>
         <Card>
-          <CardContent className="py-12 text-center text-gray-500">
-            {t('ownerNotFound')}
-          </CardContent>
+          <CardContent className="py-12 text-center text-gray-500">{t('ownerNotFound')}</CardContent>
         </Card>
       </div>
     )
@@ -66,26 +68,7 @@ export function OwnerDetailPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{t('ownerDogs')}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {dogs.length === 0 && (
-            <p className="text-sm text-muted-foreground">{t('noOwnerDogs')}</p>
-          )}
-          {dogs.map((dog) => (
-            <Link
-              key={dog.id}
-              to={`/dogs/${dog.id}`}
-              className="block rounded-md border p-3 text-sm transition-colors hover:bg-accent"
-            >
-              <span className="font-medium text-gray-900">{dog.name}</span>
-              {dog.breed && <span className="ml-2 text-muted-foreground">{dog.breed}</span>}
-            </Link>
-          ))}
-        </CardContent>
-      </Card>
+      <OwnerDogsSection ownerId={owner.id} />
 
       <DisclosureSection title={t('ownerNotes')} openLabel={t('openNotes')}>
         <NotesEditor scope="owner" entityId={owner.id} />

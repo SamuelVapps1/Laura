@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 
-import { DogSearchSelect } from '@/components/appointments/DogSearchSelect'
+import { DogFormDialog } from '@/components/dogs/DogFormDialog'
+import { OwnerDogSelect } from '@/components/dogs/OwnerDogSelect'
+import { OwnerSearchSelect } from '@/components/dogs/OwnerSearchSelect'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -24,6 +26,12 @@ import {
   toDateInputValue,
   toTimeInputValue,
 } from '@/lib/appointments'
+import {
+  CUSTOM_SERVICE_PRESET_ID,
+  SERVICE_PRESETS,
+  findServicePresetIdForStoredName,
+  getServicePresetById,
+} from '@/lib/servicePresets'
 
 interface AppointmentFormDialogProps {
   open: boolean
@@ -41,11 +49,16 @@ export function AppointmentFormDialog({
   const dogs = useLiveQuery(() => db.dogs.toArray(), [], [])
   const owners = useLiveQuery(() => db.owners.toArray(), [], [])
 
+  const [ownerId, setOwnerId] = useState('')
   const [dogId, setDogId] = useState('')
+  const [dogFormOpen, setDogFormOpen] = useState(false)
+
+  const [servicePresetId, setServicePresetId] = useState<string>('small_grooming')
+  const [customServiceName, setCustomServiceName] = useState('')
+
   const [date, setDate] = useState(toDateInputValue(selectedDate))
   const [time, setTime] = useState('09:00')
   const [durationMinutes, setDurationMinutes] = useState('60')
-  const [serviceName, setServiceName] = useState('')
   const [price, setPrice] = useState('')
   const [status, setStatus] = useState<Appointment['status']>('scheduled')
   const [notes, setNotes] = useState('')
@@ -59,49 +72,125 @@ export function AppointmentFormDialog({
 
     if (appointment) {
       const startsAt = new Date(appointment.startsAt)
+      setOwnerId(appointment.ownerId)
       setDogId(appointment.dogId)
       setDate(toDateInputValue(startsAt))
       setTime(toTimeInputValue(startsAt))
       setDurationMinutes(String(getAppointmentDurationMinutes(appointment)))
-      setServiceName(appointment.serviceName ?? '')
       setPrice(appointment.price?.toString() ?? '')
       setStatus(appointment.status)
       setNotes(appointment.notes ?? '')
       setPaid(appointment.paid)
       setCameDirty(appointment.cameDirty)
+
+      const presetId = findServicePresetIdForStoredName(appointment.serviceName, t)
+      setServicePresetId(presetId)
+      setCustomServiceName(presetId === CUSTOM_SERVICE_PRESET_ID ? (appointment.serviceName ?? '') : '')
     } else {
+      setOwnerId('')
       setDogId('')
       setDate(toDateInputValue(selectedDate))
       setTime('09:00')
-      setDurationMinutes('60')
-      setServiceName('')
-      setPrice('')
       setStatus('scheduled')
       setNotes('')
       setPaid(false)
       setCameDirty(false)
+
+      const starter = SERVICE_PRESETS.find((p) => p.id !== CUSTOM_SERVICE_PRESET_ID) ?? SERVICE_PRESETS[0]
+      setServicePresetId(starter.id)
+      setCustomServiceName('')
+      if (starter.durationMinutes != null) {
+        setDurationMinutes(String(starter.durationMinutes))
+      } else {
+        setDurationMinutes('60')
+      }
+      if (starter.price != null) {
+        setPrice(String(starter.price))
+      } else {
+        setPrice('')
+      }
     }
 
     setError(null)
   }, [open, appointment, selectedDate])
 
+  useEffect(() => {
+    if (!open) return
+    if (!ownerId) {
+      setDogId('')
+    }
+  }, [open, ownerId])
+
+  useEffect(() => {
+    if (!open || !ownerId || !dogId) return
+    const global = dogs.find((d) => d.id === dogId)
+    if (global && global.ownerId !== ownerId) {
+      setDogId('')
+    }
+  }, [open, ownerId, dogId, dogs])
+
+  const dogsForOwner = useMemo(() => {
+    if (!ownerId) return []
+    return dogs.filter((dog) => dog.ownerId === ownerId).sort((a, b) => a.name.localeCompare(b.name, 'sk'))
+  }, [dogs, ownerId])
+
+  function applyPresetFields(preset: { durationMinutes: number | null; price: number | null }) {
+    if (preset.durationMinutes !== null) {
+      setDurationMinutes(String(preset.durationMinutes))
+    }
+    if (preset.price !== null) {
+      setPrice(String(preset.price))
+    }
+  }
+
+  const handlePresetChange = (presetId: string) => {
+    setServicePresetId(presetId)
+    const preset = getServicePresetById(presetId)
+    if (!preset) return
+
+    if (preset.id === CUSTOM_SERVICE_PRESET_ID) {
+      return
+    }
+
+    applyPresetFields(preset)
+  }
+
+  const resolveServiceNameForSubmit = (): string | null => {
+    if (servicePresetId === CUSTOM_SERVICE_PRESET_ID) {
+      const trimmed = customServiceName.trim()
+      return trimmed ? trimmed : null
+    }
+    const preset = getServicePresetById(servicePresetId)
+    if (!preset) return null
+    return t(preset.labelKey)
+  }
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
     setError(null)
+
+    if (!ownerId) {
+      setError(t('errorOwnerRequired'))
+      return
+    }
 
     if (!dogId) {
       setError(t('errorDogRequired'))
       return
     }
 
-    const selectedDog = dogs.find((dog) => dog.id === dogId)
+    const selectedDog = dogs.find((d) => d.id === dogId)
     if (!selectedDog) {
       setError(t('errorDogNotFound'))
       return
     }
 
-    const selectedOwner = owners.find((owner) => owner.id === selectedDog.ownerId)
-    if (!selectedOwner) {
+    if (selectedDog.ownerId !== ownerId) {
+      setError(t('errorDogMustBelongToOwner'))
+      return
+    }
+
+    if (!owners.some((ownerRow) => ownerRow.id === ownerId)) {
       setError(t('errorOwnerNotFound'))
       return
     }
@@ -135,7 +224,7 @@ export function AppointmentFormDialog({
         date,
         time,
         durationMinutes: parsedDuration,
-        serviceName: serviceName.trim() || null,
+        serviceName: resolveServiceNameForSubmit(),
         price: parsedPrice,
         status,
         notes: notes.trim() || null,
@@ -160,67 +249,86 @@ export function AppointmentFormDialog({
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
       setError(null)
+      setDogFormOpen(false)
     }
     onOpenChange(nextOpen)
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[680px]">
-        <DialogHeader>
-          <DialogTitle>{appointment ? t('dialogEditAppointment') : t('dialogAddAppointment')}</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit}>
-          <div className="grid gap-4 py-4">
-            <DogSearchSelect
-              dogs={dogs}
-              owners={owners}
-              value={dogId}
-              onChange={setDogId}
-            />
+    <>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[680px]">
+          <DialogHeader>
+            <DialogTitle>{appointment ? t('dialogEditAppointment') : t('dialogAddAppointment')}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit}>
+            <div className="grid gap-4 py-4">
+              <OwnerSearchSelect owners={owners} value={ownerId} onChange={setOwnerId} />
 
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div className="grid gap-2">
-                <Label htmlFor="appointment-date">{t('labelDate')} *</Label>
-                <Input
-                  id="appointment-date"
-                  type="date"
-                  value={date}
-                  onChange={(event) => setDate(event.target.value)}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="appointment-time">{t('labelTime')} *</Label>
-                <Input
-                  id="appointment-time"
-                  type="time"
-                  value={time}
-                  onChange={(event) => setTime(event.target.value)}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="appointment-duration">{t('labelDurationMinutes')} *</Label>
-                <Input
-                  id="appointment-duration"
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={durationMinutes}
-                  onChange={(event) => setDurationMinutes(event.target.value)}
-                />
-              </div>
-            </div>
+              {ownerId !== '' &&
+                (dogsForOwner.length === 0 ? (
+                  <div className="rounded-md border border-dashed p-4 text-center">
+                    <p className="text-sm text-muted-foreground">{t('ownerHasNoDogs')}</p>
+                    <Button type="button" variant="outline" className="mt-3" onClick={() => setDogFormOpen(true)}>
+                      {t('addDogForOwner')}
+                    </Button>
+                  </div>
+                ) : (
+                  <OwnerDogSelect dogs={dogsForOwner} value={dogId} onChange={setDogId} />
+                ))}
 
-            <div className="grid gap-4 sm:grid-cols-2">
+              {!ownerId && <p className="text-xs text-muted-foreground">{t('selectOwnerFirst')}</p>}
+
               <div className="grid gap-2">
-                <Label htmlFor="appointment-service">{t('labelService')}</Label>
-                <Input
-                  id="appointment-service"
-                  value={serviceName}
-                  onChange={(event) => setServiceName(event.target.value)}
-                  placeholder={t('labelService')}
-                />
+                <Label htmlFor="service-preset">{t('labelServicePreset')}</Label>
+                <Select value={servicePresetId} onValueChange={handlePresetChange}>
+                  <SelectTrigger id="service-preset">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SERVICE_PRESETS.map((preset) => (
+                      <SelectItem key={preset.id} value={preset.id}>
+                        {t(preset.labelKey)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
+
+              {servicePresetId === CUSTOM_SERVICE_PRESET_ID && (
+                <div className="grid gap-2">
+                  <Label htmlFor="appointment-service">{t('labelService')}</Label>
+                  <Input
+                    id="appointment-service"
+                    value={customServiceName}
+                    onChange={(event) => setCustomServiceName(event.target.value)}
+                    placeholder={t('labelService')}
+                  />
+                </div>
+              )}
+
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="grid gap-2">
+                  <Label htmlFor="appointment-date">{t('labelDate')} *</Label>
+                  <Input id="appointment-date" type="date" value={date} onChange={(event) => setDate(event.target.value)} />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="appointment-time">{t('labelTime')} *</Label>
+                  <Input id="appointment-time" type="time" value={time} onChange={(event) => setTime(event.target.value)} />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="appointment-duration">{t('labelDurationMinutes')} *</Label>
+                  <Input
+                    id="appointment-duration"
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={durationMinutes}
+                    onChange={(event) => setDurationMinutes(event.target.value)}
+                  />
+                </div>
+              </div>
+
               <div className="grid gap-2">
                 <Label htmlFor="appointment-price">{t('labelPrice')}</Label>
                 <Input
@@ -233,68 +341,80 @@ export function AppointmentFormDialog({
                   placeholder={t('labelPrice')}
                 />
               </div>
-            </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="appointment-status">{t('labelStatus')} *</Label>
-              <Select value={status} onValueChange={(value) => setStatus(value as Appointment['status'])}>
-                <SelectTrigger id="appointment-status">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {appointmentStatusOptions.map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {getAppointmentStatusLabel(option)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+              <div className="grid gap-2">
+                <Label htmlFor="appointment-status">{t('labelStatus')} *</Label>
+                <Select value={status} onValueChange={(value) => setStatus(value as Appointment['status'])}>
+                  <SelectTrigger id="appointment-status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {appointmentStatusOptions.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {getAppointmentStatusLabel(option)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="appointment-notes">{t('labelNotes')}</Label>
-              <Textarea
-                id="appointment-notes"
-                value={notes}
-                onChange={(event) => setNotes(event.target.value)}
-                placeholder={t('labelNotes')}
-              />
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="flex items-center gap-2 text-sm font-medium">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-input"
-                  checked={paid}
-                  onChange={(event) => setPaid(event.target.checked)}
+              <div className="grid gap-2">
+                <Label htmlFor="appointment-notes">{t('labelNotes')}</Label>
+                <Textarea
+                  id="appointment-notes"
+                  value={notes}
+                  onChange={(event) => setNotes(event.target.value)}
+                  placeholder={t('labelNotes')}
                 />
-                {t('labelPaid')}
-              </label>
-              <label className="flex items-center gap-2 text-sm font-medium">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-input"
-                  checked={cameDirty}
-                  onChange={(event) => setCameDirty(event.target.checked)}
-                />
-                {t('labelCameDirty')}
-              </label>
-            </div>
+              </div>
 
-            {error && <p className="text-sm text-red-500">{error}</p>}
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => handleOpenChange(false)} disabled={isSaving}>
-              {t('buttonCancel')}
-            </Button>
-            <Button type="submit" disabled={isSaving}>
-              {isSaving ? t('buttonSaving') : t('buttonSave')}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-input"
+                    checked={paid}
+                    onChange={(event) => setPaid(event.target.checked)}
+                  />
+                  {t('labelPaid')}
+                </label>
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-input"
+                    checked={cameDirty}
+                    onChange={(event) => setCameDirty(event.target.checked)}
+                  />
+                  {t('labelCameDirty')}
+                </label>
+              </div>
+
+              {error && <p className="text-sm text-red-500">{error}</p>}
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => handleOpenChange(false)} disabled={isSaving}>
+                {t('buttonCancel')}
+              </Button>
+              <Button type="submit" disabled={isSaving}>
+                {isSaving ? t('buttonSaving') : t('buttonSave')}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <DogFormDialog
+        open={dogFormOpen}
+        onOpenChange={setDogFormOpen}
+        owners={owners}
+        defaultOwnerId={ownerId || undefined}
+        lockOwner
+        onDogCreated={(created) => {
+          setDogId(created.id)
+          setDogFormOpen(false)
+        }}
+      />
+    </>
   )
 }
 
