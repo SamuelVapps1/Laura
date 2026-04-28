@@ -480,11 +480,16 @@ function validateBackupIntegrity(data: BackupData, photoFiles: Map<string, Uint8
   ensureUniqueValues(data.tagApplications.map((application) => `${application.tagId}\u0000${application.entityType}\u0000${application.entityId}`))
   ensureUniqueValues(data.photoSessions.map((session) => session.id))
   ensureUniqueValues(data.photos.map((photo) => photo.id))
+  ensureUniqueValues(data.dogTags.map((dogTag) => `${dogTag.dogId}\u0000${dogTag.tagId}`))
 
   const ownerIds = new Set(data.owners.map((owner) => owner.id))
+  const legacyTagIds = new Set(data.tags.map((tag) => tag.id))
+  const tagDefinitionIds = new Set(data.tagDefinitions.map((tag) => tag.id))
+  const dogsById = new Map(data.dogs.map((dog) => [dog.id, dog]))
+  const appointmentsById = new Map(data.appointments.map((appointment) => [appointment.id, appointment]))
+  const photoSessionsById = new Map(data.photoSessions.map((session) => [session.id, session]))
   const dogIds = new Set(data.dogs.map((dog) => dog.id))
   const appointmentIds = new Set(data.appointments.map((appointment) => appointment.id))
-  const photoSessionIds = new Set(data.photoSessions.map((session) => session.id))
 
   data.dogs.forEach((dog) => {
     if (!ownerIds.has(dog.ownerId)) {
@@ -492,22 +497,75 @@ function validateBackupIntegrity(data: BackupData, photoFiles: Map<string, Uint8
     }
   })
 
-  data.appointments.forEach((appointment) => {
-    if (!dogIds.has(appointment.dogId) || !ownerIds.has(appointment.ownerId)) {
+  data.dogTags.forEach((dogTag) => {
+    if (!dogIds.has(dogTag.dogId) || !legacyTagIds.has(dogTag.tagId)) {
       throw new BackupError('invalid_file')
     }
   })
 
+  data.appointments.forEach((appointment) => {
+    const dog = dogsById.get(appointment.dogId)
+
+    if (!dog || !ownerIds.has(appointment.ownerId) || dog.ownerId !== appointment.ownerId) {
+      throw new BackupError('invalid_file')
+    }
+  })
+
+  data.notes.forEach((note) => {
+    switch (note.scope) {
+      case 'owner':
+        if (!ownerIds.has(note.entityId)) throw new BackupError('invalid_file')
+        return
+      case 'dog':
+        if (!dogIds.has(note.entityId)) throw new BackupError('invalid_file')
+        return
+      case 'appointment':
+        if (!appointmentIds.has(note.entityId)) throw new BackupError('invalid_file')
+        return
+      default:
+        throw new BackupError('invalid_file')
+    }
+  })
+
+  data.tagApplications.forEach((application) => {
+    if (!tagDefinitionIds.has(application.tagId)) {
+      throw new BackupError('invalid_file')
+    }
+
+    switch (application.entityType) {
+      case 'owner':
+        if (!ownerIds.has(application.entityId)) throw new BackupError('invalid_file')
+        return
+      case 'dog':
+        if (!dogIds.has(application.entityId)) throw new BackupError('invalid_file')
+        return
+      case 'appointment':
+        if (!appointmentIds.has(application.entityId)) throw new BackupError('invalid_file')
+        return
+      default:
+        throw new BackupError('invalid_file')
+    }
+  })
+
   data.photoSessions.forEach((session) => {
-    if (!appointmentIds.has(session.appointmentId) || !dogIds.has(session.dogId)) {
+    const appointment = appointmentsById.get(session.appointmentId)
+
+    if (!appointment || !dogIds.has(session.dogId) || appointment.dogId !== session.dogId) {
       throw new BackupError('invalid_file')
     }
   })
 
   data.photos.forEach((photo) => {
     const bytes = photoFiles.get(photo.filePath)
+    const session = photoSessionsById.get(photo.sessionId)
 
-    if (!appointmentIds.has(photo.appointmentId) || !dogIds.has(photo.dogId) || !photoSessionIds.has(photo.sessionId)) {
+    if (
+      !session ||
+      !appointmentIds.has(photo.appointmentId) ||
+      !dogIds.has(photo.dogId) ||
+      photo.appointmentId !== session.appointmentId ||
+      photo.dogId !== session.dogId
+    ) {
       throw new BackupError('invalid_file')
     }
 
