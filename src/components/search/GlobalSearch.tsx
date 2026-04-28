@@ -49,16 +49,19 @@ export function GlobalSearch() {
     }
   }, [])
 
-  const queryIsSearchable = debouncedQuery.trim().length >= MIN_QUERY_LENGTH
+  const trimmedQuery = query.trim()
+  const trimmedDebouncedQuery = debouncedQuery.trim()
+  const queryIsSearchable = trimmedDebouncedQuery.length >= MIN_QUERY_LENGTH
   const groupedResults = useMemo(
     () => queryIsSearchable ? searchAll(debouncedQuery) : emptyResults(),
     [debouncedQuery, queryIsSearchable, version]
   )
   const sections = useMemo(() => buildSections(groupedResults), [groupedResults])
   const flatResults = useMemo(() => sections.flatMap((section) => section.results), [sections])
-  const showDropdown = open && query.trim().length >= MIN_QUERY_LENGTH
-  const waitingForDebounce = query.trim() !== debouncedQuery.trim()
-  const loading = showDropdown && (!ready || (building && !ready) || waitingForDebounce)
+  const showDropdown = open && trimmedQuery.length > 0
+  const showMinChars = showDropdown && trimmedQuery.length < MIN_QUERY_LENGTH
+  const waitingForDebounce = trimmedQuery !== trimmedDebouncedQuery
+  const loading = showDropdown && !showMinChars && (!ready || (building && !ready) || waitingForDebounce)
 
   useEffect(() => {
     setActiveIndex(0)
@@ -108,14 +111,16 @@ export function GlobalSearch() {
       <Input
         value={query}
         onChange={(event) => {
-          setQuery(event.target.value)
-          setOpen(event.target.value.trim().length >= MIN_QUERY_LENGTH)
+          const nextQuery = event.target.value
+          setQuery(nextQuery)
+          setOpen(nextQuery.trim().length > 0)
         }}
-        onFocus={() => setOpen(query.trim().length >= MIN_QUERY_LENGTH)}
+        onFocus={() => setOpen(trimmedQuery.length > 0)}
         onKeyDown={handleKeyDown}
         placeholder={t('globalSearchPlaceholder')}
         className="h-9 border-slate-700 bg-slate-800 pl-9 text-sm text-white placeholder:text-slate-400 focus-visible:ring-slate-400 focus-visible:ring-offset-slate-900"
         role="combobox"
+        aria-label={t('globalSearchPlaceholder')}
         aria-expanded={showDropdown}
         aria-controls="global-search-results"
       />
@@ -126,22 +131,22 @@ export function GlobalSearch() {
           role="listbox"
           className="absolute right-0 top-full z-50 mt-2 max-h-[70vh] w-full min-w-[min(28rem,calc(100vw-2rem))] overflow-y-auto rounded-md border border-slate-200 bg-white py-2 text-slate-900 shadow-lg"
         >
-          {loading ? (
+          {showMinChars ? (
+            <SearchMessage>{t('globalSearchMinChars')}</SearchMessage>
+          ) : loading ? (
             <SearchMessage>{t('globalSearchLoading')}</SearchMessage>
           ) : flatResults.length === 0 ? (
             <SearchMessage>{t('globalSearchNoResults')}</SearchMessage>
           ) : (
-            <div className="grid gap-2">
-              {sections.map((section) => (
-                <SearchResultSection
-                  key={section.key}
-                  section={section}
-                  activeIndex={activeIndex}
-                  flatResults={flatResults}
-                  onOpenResult={openResult}
-                />
-              ))}
-            </div>
+            sections.map((section) => (
+              <SearchResultSection
+                key={section.key}
+                section={section}
+                activeIndex={activeIndex}
+                flatResults={flatResults}
+                onOpenResult={openResult}
+              />
+            ))
           )}
         </div>
       )}
@@ -161,7 +166,7 @@ function SearchResultSection({
   onOpenResult: (result: SearchResult) => void
 }) {
   return (
-    <section>
+    <section role="group" aria-label={section.label}>
       <h2 className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
         {section.label}
       </h2>
@@ -175,7 +180,7 @@ function SearchResultSection({
               key={result.id}
               type="button"
               role="option"
-              aria-selected={active}
+              aria-selected={active ? 'true' : 'false'}
               aria-label={t('globalSearchOpenResult')}
               className={cn(
                 'grid gap-0.5 px-3 py-2 text-left transition-colors',
@@ -201,7 +206,7 @@ function SearchResultSection({
 }
 
 function SearchMessage({ children }: { children: string }) {
-  return <p className="px-3 py-4 text-sm text-slate-500">{children}</p>
+  return <p role="option" aria-disabled="true" aria-selected="false" className="px-3 py-4 text-sm text-slate-500">{children}</p>
 }
 
 function buildSections(results: GroupedSearchResults): SearchSection[] {

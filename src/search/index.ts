@@ -110,6 +110,7 @@ let state: SearchIndexState = {
 let dexieSubscription: Subscription | null = null
 let rebuildTimer: number | null = null
 let latestSnapshot: SearchSnapshot | null = null
+let initialBuildPromise: Promise<void> | null = null
 let rebuilding = false
 let rebuildQueued = false
 
@@ -128,8 +129,15 @@ export function subscribeSearchIndexState(callback: (state: SearchIndexState) =>
   }
 }
 
-export async function initSearchIndex(): Promise<void> {
-  await rebuildSearchIndex()
+export function initSearchIndex(): Promise<void> {
+  if (state.ready) return Promise.resolve()
+  if (initialBuildPromise) return initialBuildPromise
+
+  initialBuildPromise = rebuildSearchIndex().finally(() => {
+    initialBuildPromise = null
+  })
+
+  return initialBuildPromise
 }
 
 export async function rebuildSearchIndex(snapshot?: SearchSnapshot): Promise<void> {
@@ -145,6 +153,9 @@ export async function rebuildSearchIndex(snapshot?: SearchSnapshot): Promise<voi
     const nextSnapshot = snapshot ?? await loadSearchSnapshot()
     buildSearchIndex(nextSnapshot)
     setState({ ready: true, building: false, version: state.version + 1 })
+  } catch (error) {
+    setState({ building: false })
+    throw error
   } finally {
     rebuilding = false
 
@@ -515,7 +526,7 @@ function scheduleRebuild(snapshot: SearchSnapshot | null): void {
 
   rebuildTimer = window.setTimeout(() => {
     rebuildTimer = null
-    void rebuildSearchIndex(snapshot ?? undefined)
+    void rebuildSearchIndex(snapshot ?? undefined).catch(() => undefined)
   }, REBUILD_DEBOUNCE_MS)
 }
 

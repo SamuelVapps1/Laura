@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 
 import {
   getSearchIndexState,
+  initSearchIndex,
   subscribeSearchIndexState,
   subscribeSearchIndexToDexie,
   type SearchIndexState,
@@ -14,6 +15,7 @@ export function SearchProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const unsubscribeState = subscribeSearchIndexState(setState)
+    void initSearchIndex().catch(() => undefined)
     const unsubscribeDexie = subscribeSearchIndexToDexie()
 
     return () => {
