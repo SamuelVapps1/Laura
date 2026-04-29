@@ -10,7 +10,10 @@ import { Sidebar } from './Sidebar'
 
 export function AppLayout() {
   const location = useLocation()
-  const showBackupWarning = location.pathname === '/' || location.pathname.startsWith('/calendar')
+  const showBackupWarning =
+    location.pathname === '/' ||
+    location.pathname === '/dashboard' ||
+    location.pathname.startsWith('/calendar')
 
   useEffect(() => {
     void requestPersistentStorageOnce().catch(() => undefined)

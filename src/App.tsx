@@ -4,6 +4,7 @@ import { RequireUnlock } from "./auth/RequireUnlock"
 import { ErrorBoundary } from "./components/ErrorBoundary"
 import { AppLayout } from "./components/layout/AppLayout"
 import { AppBusyProvider } from "./context/AppBusyContext"
+import { DashboardPage } from "./pages/DashboardPage"
 import { CalendarPage } from "./pages/CalendarPage"
 import { OwnersPage } from "./pages/OwnersPage"
 import { OwnerDetailPage } from "./pages/OwnerDetailPage"
@@ -25,7 +26,7 @@ const router = createBrowserRouter([
   },
   {
     path: "/",
-    element: <Navigate to="/calendar" replace />,
+    element: <Navigate to="/dashboard" replace />,
   },
   {
     path: "/",
@@ -37,6 +38,10 @@ const router = createBrowserRouter([
       </RequireUnlock>
     ),
     children: [
+      {
+        path: "dashboard",
+        element: <DashboardPage />,
+      },
       {
         path: "calendar",
         element: <CalendarPage />,

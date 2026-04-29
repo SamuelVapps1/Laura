@@ -1,9 +1,10 @@
 import { NavLink } from "react-router-dom"
-import { Calendar, Users, Dog, Tag, Settings } from "lucide-react"
+import { Calendar, Users, Dog, Tag, Settings, LayoutDashboard } from "lucide-react"
 import { t } from "@/i18n/sk"
 import { cn } from "@/lib/utils"
 
 const navItems = [
+  { href: "/dashboard", label: t("navDashboard"), icon: LayoutDashboard },
   { href: "/calendar", label: t("navCalendar"), icon: Calendar },
   { href: "/owners", label: t("navOwners"), icon: Users },
   { href: "/dogs", label: t("navDogs"), icon: Dog },
