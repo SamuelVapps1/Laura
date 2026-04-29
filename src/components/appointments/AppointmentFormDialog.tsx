@@ -40,6 +40,7 @@ interface AppointmentFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   selectedDate: Date
+  defaultTime?: string
   appointment?: Appointment
 }
 
@@ -47,6 +48,7 @@ export function AppointmentFormDialog({
   open,
   onOpenChange,
   selectedDate,
+  defaultTime,
   appointment,
 }: AppointmentFormDialogProps) {
   const dogs = useLiveQuery(() => db.dogs.toArray(), [], [])
@@ -99,7 +101,7 @@ export function AppointmentFormDialog({
       setOwnerId('')
       setDogId('')
       setDate(toDateInputValue(selectedDate))
-      setTime('09:00')
+      setTime(defaultTime ?? '09:00')
       setStatus('scheduled')
       setNotes('')
       setPaid(false)
@@ -122,7 +124,7 @@ export function AppointmentFormDialog({
     }
 
     setError(null)
-  }, [open, appointment, selectedDate])
+  }, [open, appointment, selectedDate, defaultTime])
 
   useEffect(() => {
     if (!open) return

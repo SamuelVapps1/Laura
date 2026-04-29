@@ -22,6 +22,7 @@ import {
   getAppointmentStatusLabel,
   toDateInputValue,
   toMonthInputValue,
+  toTimeInputValue,
 } from '@/lib/appointments'
 import { cn } from '@/lib/utils'
 
@@ -45,6 +46,8 @@ export function CalendarPage() {
   const { appointmentId } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
   const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [quickCreateDate, setQuickCreateDate] = useState<Date | null>(null)
+  const [quickCreateTime, setQuickCreateTime] = useState<string | null>(null)
   const [selectedActionAppointment, setSelectedActionAppointment] = useState<Appointment | null>(null)
   const [completionDialogOpen, setCompletionDialogOpen] = useState(false)
   const [completionMode, setCompletionMode] = useState<'finish' | 'cancel'>('finish')
@@ -149,6 +152,20 @@ export function CalendarPage() {
     setSearchParams(nextParams)
   }
 
+  const openCreateDialog = (options: { date?: Date; time?: string | null } = {}) => {
+    setQuickCreateDate(options.date ?? null)
+    setQuickCreateTime(options.time ?? null)
+    setIsCreateOpen(true)
+  }
+
+  const handleCreateOpenChange = (open: boolean) => {
+    if (!open) {
+      setQuickCreateDate(null)
+      setQuickCreateTime(null)
+    }
+    setIsCreateOpen(open)
+  }
+
   const handleSelectDate = (date?: Date) => {
     if (!date) return
 
@@ -181,6 +198,15 @@ export function CalendarPage() {
 
   const handleSlotClick = (slotDate: Date) => {
     setCalendarFocusDate(slotDate)
+    openCreateDialog({
+      date: slotDate,
+      time: toTimeInputValue(slotDate),
+    })
+  }
+
+  const handleMonthDayDoubleClick = (date: Date) => {
+    handleSelectDate(date)
+    openCreateDialog({ date, time: null })
   }
 
   const handlePreviousPeriod = () => {
@@ -275,7 +301,7 @@ export function CalendarPage() {
           <h1 className="text-2xl font-bold text-gray-900">{t('pageCalendarTitle')}</h1>
           <p className="mt-2 text-gray-600">{t('pageCalendarDescription')}</p>
         </div>
-        <Button className="hidden sm:inline-flex" onClick={() => setIsCreateOpen(true)}>
+        <Button className="hidden sm:inline-flex" onClick={() => openCreateDialog()}>
           <Plus className="h-4 w-4" />
           {t('buttonNewAppointment')}
         </Button>
@@ -330,6 +356,7 @@ export function CalendarPage() {
                   <CalendarDayButton
                     {...props}
                     bookedByDate={bookedByDate}
+                    onDayDoubleClick={handleMonthDayDoubleClick}
                   />
                 ),
               }}
@@ -362,7 +389,7 @@ export function CalendarPage() {
             selectedDate={selectedDate}
             onAppointmentClick={handleAppointmentClick}
             onAppointmentAction={handleAppointmentAction}
-            onCreateAppointment={() => setIsCreateOpen(true)}
+            onCreateAppointment={() => openCreateDialog()}
           />
         </div>
       )}
@@ -386,14 +413,14 @@ export function CalendarPage() {
             selectedDate={selectedDate}
             onAppointmentClick={handleAppointmentClick}
             onAppointmentAction={handleAppointmentAction}
-            onCreateAppointment={() => setIsCreateOpen(true)}
+            onCreateAppointment={() => openCreateDialog()}
           />
         </div>
       )}
 
       <Button
         className="fixed bottom-6 right-6 z-30 rounded-full shadow-lg sm:hidden"
-        onClick={() => setIsCreateOpen(true)}
+        onClick={() => openCreateDialog()}
         data-print-hidden="true"
       >
         <Plus className="h-4 w-4" />
@@ -402,8 +429,9 @@ export function CalendarPage() {
 
       <AppointmentFormDialog
         open={isCreateOpen}
-        onOpenChange={setIsCreateOpen}
-        selectedDate={selectedDate}
+        onOpenChange={handleCreateOpenChange}
+        selectedDate={quickCreateDate ?? selectedDate}
+        defaultTime={quickCreateTime ?? undefined}
       />
 
       <AppointmentDetailPanel
@@ -440,6 +468,7 @@ export function CalendarPage() {
 
 type CalendarDayButtonProps = DayButtonProps & {
   bookedByDate: Map<string, Appointment[]>
+  onDayDoubleClick: (date: Date) => void
 }
 
 function CalendarDayButton({
@@ -448,6 +477,7 @@ function CalendarDayButton({
   day,
   modifiers,
   bookedByDate,
+  onDayDoubleClick,
   ...props
 }: CalendarDayButtonProps) {
   const dateKey = toDateInputValue(day.date)
@@ -463,6 +493,11 @@ function CalendarDayButton({
         modifiers.booked && "font-semibold"
       )}
       {...props}
+      onDoubleClick={(event) => {
+        props.onDoubleClick?.(event)
+        if (event.defaultPrevented) return
+        onDayDoubleClick(day.date)
+      }}
     >
       <span>{children}</span>
       {statusDots.length > 0 && (
