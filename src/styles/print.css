@@ -1,0 +1,51 @@
+@media print {
+  @page {
+    margin: 12mm;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  header,
+  nav,
+  aside,
+  [role='dialog'],
+  [role='menu'],
+  [data-radix-popper-content-wrapper],
+  [data-print-hidden='true'] {
+    display: none !important;
+  }
+
+  main * {
+    visibility: hidden;
+  }
+
+  [data-print-section='day-schedule'],
+  [data-print-section='day-schedule'] * {
+    visibility: visible;
+  }
+
+  [data-print-section='day-schedule'] {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    color: #000000 !important;
+    background: #ffffff !important;
+  }
+
+  [data-print-section='day-schedule'] .print-appointment-row {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    border: 1px solid #d1d5db !important;
+    background: #ffffff !important;
+  }
+}

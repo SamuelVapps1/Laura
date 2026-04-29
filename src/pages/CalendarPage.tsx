@@ -17,6 +17,7 @@ import { db } from '@/db/db'
 import { t } from '@/i18n/sk'
 import { toDateInputValue, toMonthInputValue } from '@/lib/appointments'
 import { cn } from '@/lib/utils'
+import '@/styles/print.css'
 
 export function CalendarPage() {
   const navigate = useNavigate()
@@ -170,7 +171,7 @@ export function CalendarPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start justify-between gap-4" data-print-hidden="true">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{t('pageCalendarTitle')}</h1>
           <p className="mt-2 text-gray-600">{t('pageCalendarDescription')}</p>
@@ -182,7 +183,7 @@ export function CalendarPage() {
       </div>
 
       <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
-        <section className="min-w-0 overflow-hidden rounded-lg border bg-card p-3 shadow-sm sm:p-4">
+        <section className="min-w-0 overflow-hidden rounded-lg border bg-card p-3 shadow-sm sm:p-4 print:hidden" data-print-hidden="true">
           <DayPicker
             mode="single"
             selected={selectedDate}
@@ -229,6 +230,7 @@ export function CalendarPage() {
       <Button
         className="fixed bottom-6 right-6 z-30 rounded-full shadow-lg sm:hidden"
         onClick={() => setIsCreateOpen(true)}
+        data-print-hidden="true"
       >
         <Plus className="h-4 w-4" />
         {t('buttonNewAppointment')}
