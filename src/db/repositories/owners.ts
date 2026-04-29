@@ -13,6 +13,7 @@ export async function createOwner(input: NewOwnerInput): Promise<Owner> {
     phone: input.phone ?? null,
     email: input.email ?? null,
     notes: input.notes ?? null,
+    gdprConsent: input.gdprConsent ?? false,
     createdAt: now,
     updatedAt: now,
     _search: ''
@@ -37,6 +38,7 @@ export async function updateOwner(id: string, patch: UpdateOwnerInput): Promise<
       phone: patch.phone !== undefined ? patch.phone : existing.phone,
       email: patch.email !== undefined ? patch.email : existing.email,
       notes: patch.notes !== undefined ? patch.notes : existing.notes,
+      gdprConsent: patch.gdprConsent !== undefined ? patch.gdprConsent : existing.gdprConsent,
       updatedAt: new Date().toISOString(),
       _search: ''
     }

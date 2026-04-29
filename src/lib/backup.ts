@@ -498,7 +498,7 @@ export async function restoreBackup(
       current += 1
       reportProgress(onProgress, { stage: 'restoring', current, total: data.photos.length + 12 })
 
-      if (data.owners.length > 0) await db.owners.bulkAdd(data.owners)
+      if (data.owners.length > 0) await db.owners.bulkAdd(data.owners.map(normalizeBackupOwner))
       current += 1
       reportProgress(onProgress, { stage: 'restoring', current, total: data.photos.length + 12 })
 
@@ -795,6 +795,12 @@ function validateBackupIntegrity(data: BackupData, photoFiles: Map<string, Uint8
 function validateOwner(value: unknown): asserts value is Owner {
   const record = requireRecord(value)
   requireString(record.id)
+
+  if (record.gdprConsent === undefined) {
+    record.gdprConsent = false
+  } else if (typeof record.gdprConsent !== 'boolean') {
+    throw new BackupError('invalid_file')
+  }
 }
 
 function validateDog(value: unknown): asserts value is Dog {
@@ -1095,5 +1101,12 @@ function normalizeBackupTagDefinition<T extends { isActive?: boolean }>(definiti
   return {
     ...definition,
     isActive: definition.isActive ?? true,
+  }
+}
+
+function normalizeBackupOwner(owner: Owner): Owner {
+  return {
+    ...owner,
+    gdprConsent: owner.gdprConsent ?? false,
   }
 }

@@ -1,9 +1,10 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 
 import { DisclosureSection } from '@/components/DisclosureSection'
 import { NotesEditor } from '@/components/NotesEditor'
+import { OwnerFormDialog } from '@/components/owners/OwnerFormDialog'
 import { OwnerDogsSection } from '@/components/owners/OwnerDogsSection'
 import { OwnerStatsCard } from '@/components/owners/OwnerStatsCard'
 import { TagPicker } from '@/components/TagPicker'
@@ -15,6 +16,7 @@ import { t } from '@/i18n/sk'
 export function OwnerDetailPage() {
   const { ownerId = '' } = useParams()
   const location = useLocation()
+  const [ownerFormOpen, setOwnerFormOpen] = useState(false)
 
   const owner = useLiveQuery(
     async () => (ownerId ? ((await db.owners.get(ownerId)) ?? null) : null),
@@ -53,9 +55,14 @@ export function OwnerDetailPage() {
           <h1 className="text-2xl font-bold text-gray-900">{t('ownerDetail')}</h1>
           <p className="mt-2 text-gray-600">{owner.fullName}</p>
         </div>
-        <Button asChild variant="outline">
-          <Link to="/owners">{t('backToOwners')}</Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" onClick={() => setOwnerFormOpen(true)}>
+            {t('buttonEdit')}
+          </Button>
+          <Button asChild variant="outline">
+            <Link to="/owners">{t('backToOwners')}</Link>
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -65,6 +72,7 @@ export function OwnerDetailPage() {
         <CardContent className="grid gap-3 text-sm">
           {owner.phone && <DetailRow label={t('labelPhone')} value={owner.phone} />}
           {owner.email && <DetailRow label={t('labelEmail')} value={owner.email} />}
+          <DetailRow label={t('ownerGdprConsent')} value={owner.gdprConsent ? t('yes') : t('no')} />
           {owner.notes && <DetailRow label={t('legacyNotes')} value={owner.notes} />}
         </CardContent>
       </Card>
@@ -79,6 +87,12 @@ export function OwnerDetailPage() {
       <DisclosureSection title={t('ownerTags')} openLabel={t('openTags')}>
         <TagPicker entityType="owner" entityId={owner.id} />
       </DisclosureSection>
+
+      <OwnerFormDialog
+        open={ownerFormOpen}
+        onOpenChange={setOwnerFormOpen}
+        owner={owner}
+      />
     </div>
   )
 }

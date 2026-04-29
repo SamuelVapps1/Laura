@@ -14,6 +14,7 @@ export interface Owner {
   phone: string | null
   email: string | null
   notes: string | null
+  gdprConsent: boolean
   createdAt: ISODateTime
   updatedAt: ISODateTime
   _search: string
@@ -134,6 +135,7 @@ export type NewOwnerInput = {
   phone?: string | null
   email?: string | null
   notes?: string | null
+  gdprConsent?: boolean
 }
 
 export type UpdateOwnerInput = Partial<NewOwnerInput>
@@ -154,7 +156,7 @@ export type NewDogInput = {
 
 export type UpdateDogInput = Partial<NewDogInput>
 
-export const DB_SCHEMA_VERSION = 5
+export const DB_SCHEMA_VERSION = 6
 
 class SalonDatabase extends Dexie {
   owners!: Table<Owner, string>
@@ -291,6 +293,26 @@ class SalonDatabase extends Dexie {
       await tagDefinitions.toCollection().modify((definition) => {
         if (definition.isActive === undefined) {
           definition.isActive = true
+        }
+      })
+    })
+    this.version(6).stores({
+      owners: 'id, fullName, phone, createdAt, updatedAt, _search',
+      dogs: 'id, ownerId, name, breed, createdAt, updatedAt, _search',
+      appointments: 'id, dogId, ownerId, startsAt, endsAt, status, createdAt, updatedAt, _search',
+      tags: 'id, name, createdAt, updatedAt, _search',
+      dogTags: 'id, dogId, tagId, [dogId+tagId]',
+      appSettings: 'key, updatedAt',
+      notes: '[scope+entityId], scope, entityId, updatedAt, _search',
+      tagDefinitions: 'id, label, updatedAt, _search, *scopes',
+      tagApplications: '[tagId+entityType+entityId], tagId, entityType, entityId, [entityType+entityId]',
+      photoSessions: 'id, appointmentId, dogId, updatedAt',
+      photos: 'id, sessionId, appointmentId, dogId, groupId, kind, variant, createdAt, [sessionId+kind], [sessionId+kind+variant], [dogId+sessionId]',
+    }).upgrade(async (transaction) => {
+      const owners = transaction.table<Owner & { gdprConsent?: boolean }, string>('owners')
+      await owners.toCollection().modify((owner) => {
+        if (owner.gdprConsent === undefined) {
+          owner.gdprConsent = false
         }
       })
     })

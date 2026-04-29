@@ -1,8 +1,9 @@
-import { Link } from 'react-router-dom'
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 
 import { DogFormDialog } from '@/components/dogs/DogFormDialog'
+import { EntityTagChips } from '@/components/tags/EntityTagChips'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { Dog } from '@/db/db'
@@ -58,21 +59,25 @@ export function OwnerDogsSection({ ownerId }: OwnerDogsSectionProps) {
               {dogs.map((dog) => (
                 <li
                   key={dog.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3 text-sm"
+                  className="flex flex-wrap items-start justify-between gap-3 rounded-md border p-3 text-sm"
                 >
-                  <div className="min-w-0">
-                    <span className="font-medium text-gray-900">{dog.name}</span>
-                    {dog.breed && <span className="ml-2 text-muted-foreground">{dog.breed}</span>}
-                    <span className="ml-2 text-muted-foreground">
-                      ·{' '}
-                      {t(
-                        dog.sex === 'male'
-                          ? 'labelSexMale'
-                          : dog.sex === 'female'
-                            ? 'labelSexFemale'
-                            : 'labelSexUnknown'
-                      )}
-                    </span>
+                  <div className="min-w-0 flex-1">
+                    <div>
+                      <span className="font-medium text-gray-900">{dog.name}</span>
+                      {dog.breed && <span className="ml-2 text-muted-foreground">{dog.breed}</span>}
+                      <span className="ml-2 text-muted-foreground">
+                        {' - '}
+                        {t(
+                          dog.sex === 'male'
+                            ? 'labelSexMale'
+                            : dog.sex === 'female'
+                              ? 'labelSexFemale'
+                              : 'labelSexUnknown'
+                        )}
+                      </span>
+                    </div>
+                    <EntityTagChips entityType="dog" entityId={dog.id} />
+                    <DogNotesSummary dog={dog} />
                   </div>
                   <div className="flex shrink-0 gap-2">
                     <Button asChild variant="outline" size="sm">
@@ -98,5 +103,27 @@ export function OwnerDogsSection({ ownerId }: OwnerDogsSectionProps) {
         lockOwner
       />
     </>
+  )
+}
+
+function DogNotesSummary({ dog }: { dog: Dog }) {
+  const rows = [
+    { label: t('labelBehaviorNotes'), value: dog.behaviorNotes },
+    { label: t('labelHealthNotes'), value: dog.healthNotes },
+    { label: t('labelGroomingNotes'), value: dog.groomingNotes },
+    { label: t('labelPriceNotes'), value: dog.priceNotes },
+  ].filter((row): row is { label: string; value: string } => Boolean(row.value))
+
+  if (rows.length === 0) return null
+
+  return (
+    <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+      {rows.map((row) => (
+        <p key={row.label}>
+          <span className="font-medium text-gray-700">{row.label}: </span>
+          {row.value}
+        </p>
+      ))}
+    </div>
   )
 }

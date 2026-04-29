@@ -4,12 +4,12 @@ import { Images } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 
 import { DisclosureSection } from '@/components/DisclosureSection'
-import { NotesEditor } from '@/components/NotesEditor'
+import { DogFormDialog } from '@/components/dogs/DogFormDialog'
 import { OwnerTipBadge } from '@/components/owners/OwnerTipBadge'
 import { TagPicker } from '@/components/TagPicker'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { db, type Appointment } from '@/db/db'
+import { db, type Appointment, type Dog } from '@/db/db'
 import { getOwnerTipStats } from '@/db/repositories/ownerStats'
 import { t } from '@/i18n/sk'
 import {
@@ -22,6 +22,7 @@ export function DogDetailPage() {
   const { dogId = '' } = useParams()
   const location = useLocation()
   const [visibleHistoryCount, setVisibleHistoryCount] = useState(20)
+  const [dogFormOpen, setDogFormOpen] = useState(false)
 
   const dog = useLiveQuery(
     async () => dogId ? (await db.dogs.get(dogId)) ?? null : null,
@@ -34,6 +35,7 @@ export function DogDetailPage() {
     [dog],
     undefined
   )
+  const owners = useLiveQuery(() => db.owners.toArray(), [], [])
   const ownerTipStats = useLiveQuery(
     async () => (dog ? getOwnerTipStats(dog.ownerId) : null),
     [dog?.ownerId],
@@ -89,6 +91,9 @@ export function DogDetailPage() {
           <p className="mt-2 text-gray-600">{dog.name}</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" onClick={() => setDogFormOpen(true)}>
+            {t('buttonEdit')}
+          </Button>
           <Button asChild variant="outline">
             <Link to={`/dogs/${dog.id}/gallery`}>
               <Images className="h-4 w-4" />
@@ -122,12 +127,10 @@ export function DogDetailPage() {
           <DetailRow label={t('labelSex')} value={getSexLabel(dog.sex)} />
           {dog.color && <DetailRow label={t('labelColor')} value={dog.color} />}
           {dog.weightKg !== null && <DetailRow label={t('labelWeight')} value={String(dog.weightKg)} />}
-          {dog.behaviorNotes && <DetailRow label={t('labelBehaviorNotes')} value={dog.behaviorNotes} />}
-          {dog.healthNotes && <DetailRow label={t('labelHealthNotes')} value={dog.healthNotes} />}
-          {dog.groomingNotes && <DetailRow label={t('labelGroomingNotes')} value={dog.groomingNotes} />}
-          {dog.priceNotes && <DetailRow label={t('labelPriceNotes')} value={dog.priceNotes} />}
         </CardContent>
       </Card>
+
+      <DogNotesCard dog={dog} />
 
       <Card id="history" className="scroll-mt-6">
         <CardHeader>
@@ -175,14 +178,41 @@ export function DogDetailPage() {
         </CardContent>
       </Card>
 
-      <DisclosureSection title={t('dogNotes')} openLabel={t('openNotes')}>
-        <NotesEditor scope="dog" entityId={dog.id} />
-      </DisclosureSection>
-
       <DisclosureSection title={t('dogTags')} openLabel={t('openTags')}>
         <TagPicker entityType="dog" entityId={dog.id} />
       </DisclosureSection>
+
+      <DogFormDialog
+        open={dogFormOpen}
+        onOpenChange={setDogFormOpen}
+        dog={dog}
+        owners={owners}
+      />
     </div>
+  )
+}
+
+function DogNotesCard({ dog }: { dog: Dog }) {
+  const rows = [
+    { label: t('labelBehaviorNotes'), value: dog.behaviorNotes },
+    { label: t('labelHealthNotes'), value: dog.healthNotes },
+    { label: t('labelGroomingNotes'), value: dog.groomingNotes },
+    { label: t('labelPriceNotes'), value: dog.priceNotes },
+  ].filter((row): row is { label: string; value: string } => Boolean(row.value))
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">{t('dogNotesSection')}</CardTitle>
+      </CardHeader>
+      <CardContent className="grid gap-3 text-sm">
+        {rows.length === 0 ? (
+          <p className="text-muted-foreground">{t('noDogNotes')}</p>
+        ) : (
+          rows.map((row) => <DetailRow key={row.label} label={row.label} value={row.value} />)
+        )}
+      </CardContent>
+    </Card>
   )
 }
 

@@ -20,13 +20,23 @@ interface TagDefinitionFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   tag?: TagDefinition
+  defaultScopes?: TagScope[]
+  createTitle?: string
+  onSaved?: (tag: TagDefinition) => void
 }
 
-export function TagDefinitionFormDialog({ open, onOpenChange, tag }: TagDefinitionFormDialogProps) {
+export function TagDefinitionFormDialog({
+  open,
+  onOpenChange,
+  tag,
+  defaultScopes,
+  createTitle,
+  onSaved,
+}: TagDefinitionFormDialogProps) {
   const [label, setLabel] = useState('')
   const [description, setDescription] = useState('')
   const [color, setColor] = useState<string>(TAG_COLOR_PALETTE[0])
-  const [scopes, setScopes] = useState<TagScope[]>([...tagScopes])
+  const [scopes, setScopes] = useState<TagScope[]>(() => [...(defaultScopes ?? tagScopes)])
   const [isActive, setIsActive] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
@@ -37,10 +47,10 @@ export function TagDefinitionFormDialog({ open, onOpenChange, tag }: TagDefiniti
     setLabel(tag?.label ?? '')
     setDescription(tag?.description ?? '')
     setColor(tag?.color ?? TAG_COLOR_PALETTE[0])
-    setScopes(tag ? tag.scopes : [...tagScopes])
+    setScopes(tag ? tag.scopes : [...(defaultScopes ?? tagScopes)])
     setIsActive(tag?.isActive !== false)
     setError(null)
-  }, [open, tag])
+  }, [open, tag, defaultScopes])
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -56,12 +66,14 @@ export function TagDefinitionFormDialog({ open, onOpenChange, tag }: TagDefiniti
 
     setIsSaving(true)
     try {
+      let savedTag: TagDefinition
       if (tag) {
-        await updateTagDefinition(tag.id, input)
+        savedTag = await updateTagDefinition(tag.id, input)
       } else {
-        await createTagDefinition(input)
+        savedTag = await createTagDefinition(input)
       }
 
+      onSaved?.(savedTag)
       onOpenChange(false)
     } catch (err) {
       setError(getTagFormError(err))
@@ -91,7 +103,7 @@ export function TagDefinitionFormDialog({ open, onOpenChange, tag }: TagDefiniti
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[560px]">
         <DialogHeader>
-          <DialogTitle>{tag ? t('dialogEditTag') : t('dialogAddTag')}</DialogTitle>
+          <DialogTitle>{tag ? t('dialogEditTag') : (createTitle ?? t('dialogAddTag'))}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">

@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
 
 import { DogTagSelector } from '@/components/dogs/DogTagSelector'
 import { OwnerSearchSelect } from '@/components/dogs/OwnerSearchSelect'
+import { TagDefinitionFormDialog } from '@/components/tags/TagDefinitionFormDialog'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import type { Dog, NewDogInput, Owner } from '@/db/db'
+import type { Dog, NewDogInput, Owner, TagDefinition, TagScope } from '@/db/db'
 import { createDog, updateDog } from '@/db/repositories/dogs'
 import { getTagApplicationsForEntity, setTagApplicationsForEntity } from '@/db/repositories/tags'
 import { t } from '@/i18n/sk'
@@ -26,6 +26,8 @@ interface DogFormDialogProps {
   onSuccess?: () => void
   onDogCreated?: (dog: Dog) => void
 }
+
+const DOG_TAG_DEFAULT_SCOPES: TagScope[] = ['dog']
 
 export function DogFormDialog({
   open,
@@ -49,6 +51,7 @@ export function DogFormDialog({
   const [groomingNotes, setGroomingNotes] = useState('')
   const [priceNotes, setPriceNotes] = useState('')
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
+  const [tagFormOpen, setTagFormOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
 
@@ -167,6 +170,7 @@ export function DogFormDialog({
     setGroomingNotes('')
     setPriceNotes('')
     setSelectedTagIds([])
+    setTagFormOpen(false)
     setError(null)
   }
 
@@ -181,8 +185,17 @@ export function DogFormDialog({
   const ownerPickerLocked = lockOwner
   const displayOwner = owners.find((o) => o.id === displayOwnerId)
 
+  const handleDogTagSaved = (tag: TagDefinition) => {
+    if (!tag.scopes.includes('dog') || tag.isActive === false) return
+
+    setSelectedTagIds((currentIds) => (
+      currentIds.includes(tag.id) ? currentIds : [...currentIds, tag.id]
+    ))
+  }
+
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>{dog ? t('dialogEditDog') : t('dialogAddDog')}</DialogTitle>
@@ -252,50 +265,54 @@ export function DogFormDialog({
                 placeholder={t('labelWeight')}
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="behaviorNotes">{t('labelBehaviorNotes')}</Label>
-              <Textarea
-                id="behaviorNotes"
-                value={behaviorNotes}
-                onChange={(e) => setBehaviorNotes(e.target.value)}
-                placeholder={t('labelBehaviorNotes')}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="healthNotes">{t('labelHealthNotes')}</Label>
-              <Textarea
-                id="healthNotes"
-                value={healthNotes}
-                onChange={(e) => setHealthNotes(e.target.value)}
-                placeholder={t('labelHealthNotes')}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="groomingNotes">{t('labelGroomingNotes')}</Label>
-              <Textarea
-                id="groomingNotes"
-                value={groomingNotes}
-                onChange={(e) => setGroomingNotes(e.target.value)}
-                placeholder={t('labelGroomingNotes')}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="priceNotes">{t('labelPriceNotes')}</Label>
-              <Textarea
-                id="priceNotes"
-                value={priceNotes}
-                onChange={(e) => setPriceNotes(e.target.value)}
-                placeholder={t('labelPriceNotes')}
-              />
+            <div className="grid gap-4 border-t border-border pt-4">
+              <h3 className="text-sm font-semibold text-gray-900">{t('dogNotesSection')}</h3>
+              <div className="grid gap-2">
+                <Label htmlFor="behaviorNotes">{t('labelBehaviorNotes')}</Label>
+                <Textarea
+                  id="behaviorNotes"
+                  value={behaviorNotes}
+                  onChange={(e) => setBehaviorNotes(e.target.value)}
+                  placeholder={t('labelBehaviorNotes')}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="healthNotes">{t('labelHealthNotes')}</Label>
+                <Textarea
+                  id="healthNotes"
+                  value={healthNotes}
+                  onChange={(e) => setHealthNotes(e.target.value)}
+                  placeholder={t('labelHealthNotes')}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="groomingNotes">{t('labelGroomingNotes')}</Label>
+                <Textarea
+                  id="groomingNotes"
+                  value={groomingNotes}
+                  onChange={(e) => setGroomingNotes(e.target.value)}
+                  placeholder={t('labelGroomingNotes')}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="priceNotes">{t('labelPriceNotes')}</Label>
+                <Textarea
+                  id="priceNotes"
+                  value={priceNotes}
+                  onChange={(e) => setPriceNotes(e.target.value)}
+                  placeholder={t('labelPriceNotes')}
+                />
+              </div>
             </div>
 
             <div className="grid gap-2 border-t border-border pt-4">
               <div className="flex items-center justify-between gap-3">
                 <Label>{t('labelDogTags')}</Label>
-                <Button asChild variant="ghost" size="sm" className="h-auto px-2 py-1 text-xs">
-                  <Link to="/tags">{t('manageTags')}</Link>
+                <Button type="button" variant="outline" size="sm" onClick={() => setTagFormOpen(true)}>
+                  {t('buttonNewTag')}
                 </Button>
               </div>
+              <p className="text-xs text-muted-foreground">{t('dogTagCreateHint')}</p>
               <DogTagSelector selectedTagIds={selectedTagIds} onChange={setSelectedTagIds} disabled={isSaving} />
             </div>
 
@@ -311,6 +328,15 @@ export function DogFormDialog({
           </DialogFooter>
         </form>
       </DialogContent>
-    </Dialog>
+      </Dialog>
+
+      <TagDefinitionFormDialog
+        open={tagFormOpen}
+        onOpenChange={setTagFormOpen}
+        defaultScopes={DOG_TAG_DEFAULT_SCOPES}
+        createTitle={t('dialogCreateDogTag')}
+        onSaved={handleDogTagSaved}
+      />
+    </>
   )
 }

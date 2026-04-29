@@ -19,6 +19,7 @@ export function OwnerFormDialog({ open, onOpenChange, owner, onSuccess }: OwnerF
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
   const [notes, setNotes] = useState('')
+  const [gdprConsent, setGdprConsent] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
 
@@ -29,6 +30,7 @@ export function OwnerFormDialog({ open, onOpenChange, owner, onSuccess }: OwnerF
     setPhone(owner?.phone ?? '')
     setEmail(owner?.email ?? '')
     setNotes(owner?.notes ?? '')
+    setGdprConsent(owner?.gdprConsent ?? false)
     setError(null)
   }, [open, owner])
 
@@ -47,7 +49,8 @@ export function OwnerFormDialog({ open, onOpenChange, owner, onSuccess }: OwnerF
         fullName: fullName.trim(),
         phone: phone.trim() || null,
         email: email.trim() || null,
-        notes: notes.trim() || null
+        notes: notes.trim() || null,
+        gdprConsent,
       }
 
       if (owner) {
@@ -71,6 +74,7 @@ export function OwnerFormDialog({ open, onOpenChange, owner, onSuccess }: OwnerF
     setPhone('')
     setEmail('')
     setNotes('')
+    setGdprConsent(false)
     setError(null)
   }
 
@@ -126,6 +130,15 @@ export function OwnerFormDialog({ open, onOpenChange, owner, onSuccess }: OwnerF
                 placeholder={t('labelNotes')}
               />
             </div>
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-input"
+                checked={gdprConsent}
+                onChange={(event) => setGdprConsent(event.target.checked)}
+              />
+              {t('labelOwnerGdprConsent')}
+            </label>
             {error && <p className="text-sm text-red-500">{error}</p>}
           </div>
           <DialogFooter>
