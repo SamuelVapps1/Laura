@@ -35,6 +35,7 @@ import {
   type BackupPasswordValidationCode,
 } from '@/lib/backupCrypto'
 import { validatePasswordInput } from '@/lib/password'
+import { getDiagnosticsSnapshot, type DiagnosticsSnapshot } from '@/lib/diagnostics'
 import {
   getStoredPersistentStorageStatus,
   type StoragePersistStatus,
@@ -72,6 +73,8 @@ export function SettingsPage() {
   const [unlockBackupPassword, setUnlockBackupPassword] = useState('')
   const [unlockBackupFieldErrorKey, setUnlockBackupFieldErrorKey] =
     useState<TranslationKey | null>(null)
+  const [diagnostics, setDiagnostics] = useState<DiagnosticsSnapshot | null>(null)
+  const [diagnosticsLoading, setDiagnosticsLoading] = useState(false)
 
   const refreshStorageEstimate = useCallback(async () => {
     if (!navigator.storage || typeof navigator.storage.estimate !== 'function') {
@@ -114,6 +117,20 @@ export function SettingsPage() {
       active = false
     }
   }, [])
+
+  const refreshDiagnostics = useCallback(async () => {
+    setDiagnosticsLoading(true)
+    try {
+      const snapshot = await getDiagnosticsSnapshot()
+      setDiagnostics(snapshot)
+    } finally {
+      setDiagnosticsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void refreshDiagnostics()
+  }, [refreshDiagnostics])
 
   const clearExportPasswordFields = () => {
     setExportPassword('')
@@ -360,6 +377,26 @@ export function SettingsPage() {
         </CardHeader>
         <CardContent>
           <StorageUsage storageInfo={storageInfo} persistentStorageStatus={persistentStorageStatus} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('diagnosticsTitle')}</CardTitle>
+          <CardDescription>{t('diagnosticsDescription')}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex justify-end">
+            <Button type="button" variant="outline" onClick={() => void refreshDiagnostics()} disabled={diagnosticsLoading}>
+              {t('diagnosticsRefresh')}
+            </Button>
+          </div>
+
+          {diagnostics ? (
+            <DiagnosticsView snapshot={diagnostics} />
+          ) : (
+            <p className="text-sm text-gray-600">{t('globalSearchLoading')}</p>
+          )}
         </CardContent>
       </Card>
 
@@ -918,6 +955,54 @@ function StorageUsage({
   )
 }
 
+function DiagnosticsView({ snapshot }: { snapshot: DiagnosticsSnapshot }) {
+  const entries: Array<{ label: string; value: string }> = [
+    { label: t('diagnosticsAppVersion'), value: snapshot.appVersion },
+    { label: t('diagnosticsDbVersion'), value: String(snapshot.dbSchemaVersion) },
+    {
+      label: t('diagnosticsStorageUsed'),
+      value: snapshot.storageUsageBytes === null ? '-' : formatBytes(snapshot.storageUsageBytes),
+    },
+    {
+      label: t('diagnosticsStorageQuota'),
+      value: snapshot.storageQuotaBytes === null ? '-' : formatBytes(snapshot.storageQuotaBytes),
+    },
+    {
+      label: t('diagnosticsPersistentStorage'),
+      value: snapshot.persistentStorageStatus ? getPersistentStorageStatusLabel(snapshot.persistentStorageStatus) : '-',
+    },
+    {
+      label: t('diagnosticsLastBackup'),
+      value: formatDiagnosticsLastBackup(snapshot.lastBackupAt),
+    },
+  ]
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-2 text-sm sm:grid-cols-2">
+        {entries.map((entry) => (
+          <div key={entry.label} className="rounded-md border bg-gray-50 p-3">
+            <p className="text-gray-600">{entry.label}</p>
+            <p className="font-medium text-gray-900">{entry.value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div>
+        <h3 className="mb-2 text-sm font-semibold text-gray-900">{t('diagnosticsTableCounts')}</h3>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {Object.entries(snapshot.counts).map(([tableName, count]) => (
+            <div key={tableName} className="rounded-md border bg-white px-3 py-2 text-sm">
+              <span className="font-medium text-gray-900">{tableName}</span>
+              <span className="ml-2 text-gray-700">{count}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function getPersistentStorageStatusLabel(status: StoragePersistStatus): string {
   switch (status) {
     case 'granted':
@@ -1039,4 +1124,17 @@ function formatBytes(bytes: number): string {
   }
 
   return `${mb.toFixed(1)} ${t('storageUnitMb')}`
+}
+
+function formatDiagnosticsLastBackup(lastBackupAt: string | null): string {
+  if (!lastBackupAt) {
+    return t('diagnosticsNever')
+  }
+
+  const parsed = new Date(lastBackupAt)
+  if (Number.isNaN(parsed.getTime())) {
+    return t('diagnosticsNever')
+  }
+
+  return parsed.toLocaleString('sk-SK')
 }

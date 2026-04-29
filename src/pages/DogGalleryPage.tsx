@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { ImageIcon } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 
+import { EmptyState } from '@/components/EmptyState'
 import { PhotoComparisonModal } from '@/components/photos/PhotoComparisonModal'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -126,11 +127,10 @@ export function DogGalleryPage() {
       </div>
 
       {loadedGallerySessions.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center text-gray-500">
-            {t('emptyDogGallery')}
-          </CardContent>
-        </Card>
+        <EmptyState
+          title={t('emptyGalleryTitle')}
+          description={t('emptyGalleryDescription')}
+        />
       ) : (
         <div className="grid gap-4">
           {visibleGallerySessions.map((row) => (

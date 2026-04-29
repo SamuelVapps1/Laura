@@ -67,6 +67,7 @@ export function DogsPage() {
         owners={owners || []}
         onEdit={handleEdit}
         onDelete={handleDelete}
+        onCreate={handleAdd}
       />
 
       <DogFormDialog

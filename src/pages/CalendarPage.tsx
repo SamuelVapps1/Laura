@@ -223,6 +223,7 @@ export function CalendarPage() {
           selectedDate={selectedDate}
           onAppointmentClick={handleAppointmentClick}
           onAppointmentAction={handleAppointmentAction}
+          onCreateAppointment={() => setIsCreateOpen(true)}
         />
       </div>
 

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 
+import { EmptyState } from '@/components/EmptyState'
 import { t } from '@/i18n/sk'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -11,9 +12,10 @@ interface DogsListProps {
   owners: Owner[]
   onEdit: (dog: Dog) => void
   onDelete: (dog: Dog) => void
+  onCreate?: () => void
 }
 
-export function DogsList({ dogs, owners, onEdit, onDelete }: DogsListProps) {
+export function DogsList({ dogs, owners, onEdit, onDelete, onCreate }: DogsListProps) {
   const getOwnerName = (ownerId: string) => {
     const owner = owners.find(o => o.id === ownerId)
     return owner?.fullName || '-'
@@ -21,11 +23,12 @@ export function DogsList({ dogs, owners, onEdit, onDelete }: DogsListProps) {
 
   if (dogs.length === 0) {
     return (
-      <Card>
-        <CardContent className="py-12 text-center text-gray-500">
-          {t('emptyDogs')}
-        </CardContent>
-      </Card>
+      <EmptyState
+        title={t('emptyDogsTitle')}
+        description={t('emptyDogsDescription')}
+        actionLabel={onCreate ? t('addFirstDog') : undefined}
+        onAction={onCreate}
+      />
     )
   }
 

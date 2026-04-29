@@ -4,6 +4,7 @@ import { sk } from 'date-fns/locale'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { MoreHorizontal } from 'lucide-react'
 
+import { EmptyState } from '@/components/EmptyState'
 import { OwnerTipBadge } from '@/components/owners/OwnerTipBadge'
 import { Button } from '@/components/ui/button'
 import type { Appointment, Dog, Owner } from '@/db/db'
@@ -23,6 +24,7 @@ interface DayAppointmentsPaneProps {
   selectedDate: Date
   onAppointmentClick: (appointment: Appointment) => void
   onAppointmentAction?: (appointment: Appointment, action: AppointmentAction) => void
+  onCreateAppointment?: () => void
 }
 
 type DayAppointment = {
@@ -45,6 +47,7 @@ export function DayAppointmentsPane({
   selectedDate,
   onAppointmentClick,
   onAppointmentAction,
+  onCreateAppointment,
 }: DayAppointmentsPaneProps) {
   const dayStartIso = startOfDay(selectedDate).toISOString()
   const dayEndIso = endOfDay(selectedDate).toISOString()
@@ -208,9 +211,12 @@ export function DayAppointmentsPane({
             ))}
           </div>
         ) : (
-          <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
-            {t('emptyDayAppointments')}
-          </div>
+          <EmptyState
+            title={t('emptyDayTitle')}
+            description={t('emptyDayDescription')}
+            actionLabel={onCreateAppointment ? t('addAppointment') : undefined}
+            onAction={onCreateAppointment}
+          />
         )}
       </div>
 
@@ -257,11 +263,11 @@ export function DayAppointmentsPane({
                   </div>
                   <div className="mt-1 text-sm">
                     <span className="font-medium">{owner?.fullName ?? t('appointmentUnknownOwner')}</span>
-                    {owner?.phone && <span> · {owner.phone}</span>}
+                    {owner?.phone && <span> - {owner.phone}</span>}
                   </div>
                   <div className="mt-1 text-sm">
                     <span>{t('labelService')}: {appointment.serviceName ?? t('appointmentNoService')}</span>
-                    <span> · {t('labelStatus')}: {getAppointmentStatusLabel(appointment.status)}</span>
+                    <span> - {t('labelStatus')}: {getAppointmentStatusLabel(appointment.status)}</span>
                   </div>
                   {(appointment.price !== null || appointment.tipAmount !== null) && (
                     <div className="mt-1 text-sm">
@@ -269,7 +275,7 @@ export function DayAppointmentsPane({
                         <span>{t('labelPrice')}: {formatAppointmentPrice(appointment.price)}</span>
                       )}
                       {appointment.tipAmount !== null && (
-                        <span> · {t('labelTip')}: {formatAppointmentPrice(appointment.tipAmount)}</span>
+                        <span> - {t('labelTip')}: {formatAppointmentPrice(appointment.tipAmount)}</span>
                       )}
                     </div>
                   )}

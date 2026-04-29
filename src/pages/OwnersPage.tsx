@@ -60,6 +60,7 @@ export function OwnersPage() {
         owners={owners || []}
         onEdit={handleEdit}
         onDelete={handleDelete}
+        onCreate={handleAdd}
       />
 
       <OwnerFormDialog

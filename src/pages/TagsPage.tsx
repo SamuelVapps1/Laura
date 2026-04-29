@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 
+import { EmptyState } from '@/components/EmptyState'
 import { DeleteTagDefinitionDialog } from '@/components/tags/DeleteTagDefinitionDialog'
 import { TagDefinitionFormDialog } from '@/components/tags/TagDefinitionFormDialog'
 import { TagDefinitionsList } from '@/components/tags/TagDefinitionsList'
@@ -44,11 +45,20 @@ export function TagsPage() {
         <Button onClick={handleAdd}>{t('buttonAddTag')}</Button>
       </div>
 
-      <TagDefinitionsList
-        tags={tags}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-      />
+      {tags.length === 0 ? (
+        <EmptyState
+          title={t('emptyTagsTitle')}
+          description={t('emptyTagsDescription')}
+          actionLabel={t('addFirstTag')}
+          onAction={handleAdd}
+        />
+      ) : (
+        <TagDefinitionsList
+          tags={tags}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+        />
+      )}
 
       <TagDefinitionFormDialog
         open={isFormOpen}

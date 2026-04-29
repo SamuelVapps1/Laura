@@ -153,6 +153,8 @@ export type NewDogInput = {
 
 export type UpdateDogInput = Partial<NewDogInput>
 
+export const DB_SCHEMA_VERSION = 4
+
 class SalonDatabase extends Dexie {
   owners!: Table<Owner, string>
   dogs!: Table<Dog, string>

@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 
+import { EmptyState } from '@/components/EmptyState'
 import { t } from '@/i18n/sk'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -14,9 +15,10 @@ interface OwnersListProps {
   owners: Owner[]
   onEdit: (owner: Owner) => void
   onDelete: (owner: Owner) => void
+  onCreate?: () => void
 }
 
-export function OwnersList({ owners, onEdit, onDelete }: OwnersListProps) {
+export function OwnersList({ owners, onEdit, onDelete, onCreate }: OwnersListProps) {
   const ownerIds = useMemo(() => owners.map((owner) => owner.id), [owners])
   const ownerIdsKey = useMemo(() => ownerIds.join('|'), [ownerIds])
   const emptyStatsMap = useMemo(() => new Map<string, OwnerTipStats>(), [])
@@ -29,11 +31,12 @@ export function OwnersList({ owners, onEdit, onDelete }: OwnersListProps) {
 
   if (owners.length === 0) {
     return (
-      <Card>
-        <CardContent className="py-12 text-center text-gray-500">
-          {t('emptyOwners')}
-        </CardContent>
-      </Card>
+      <EmptyState
+        title={t('emptyOwnersTitle')}
+        description={t('emptyOwnersDescription')}
+        actionLabel={onCreate ? t('addFirstOwner') : undefined}
+        onAction={onCreate}
+      />
     )
   }
 
