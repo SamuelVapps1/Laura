@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 
 import { useAuth } from '@/auth/AuthProvider'
+import { useAppBusy } from '@/context/AppBusyContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -53,6 +54,7 @@ type MessageState = {
 
 export function SettingsPage() {
   const auth = useAuth()
+  const { startBusy, endBusy } = useAppBusy()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [parsedBackup, setParsedBackup] = useState<ParsedBackupPreview | null>(null)
@@ -147,6 +149,7 @@ export function SettingsPage() {
     setExportDialogOpen(false)
     setMessage(null)
     setProgress({ stage: 'reading' })
+    const busyToken = startBusy('backup')
 
     try {
       await exportBackup(trimmedPassword, setProgress)
@@ -156,6 +159,7 @@ export function SettingsPage() {
       setMessage({ key: getBackupErrorKey(error, 'backupExportError'), tone: 'error' })
       setProgress({ stage: 'error' })
     } finally {
+      endBusy(busyToken)
       clearExportPasswordFields()
       setIsBusy(false)
     }
@@ -210,6 +214,7 @@ export function SettingsPage() {
     setMessage(null)
     setUnlockBackupFieldErrorKey(null)
     setProgress({ stage: 'parsing' })
+    const busyToken = startBusy('restore')
 
     try {
       const parsed = await parseBackupFile(selectedFile, backupPassword)
@@ -235,6 +240,7 @@ export function SettingsPage() {
       setProgress({ stage: 'error' })
       resetSelectedFile()
     } finally {
+      endBusy(busyToken)
       setIsBusy(false)
     }
   }
@@ -266,6 +272,7 @@ export function SettingsPage() {
     setIsBusy(true)
     setMessage(null)
     setProgress({ stage: 'restoring', current: 0, total: parsedBackup.counts.photos + 12 })
+    const busyToken = startBusy('restore')
 
     try {
       await restoreParsedBackup(parsedBackup, setProgress)
@@ -282,6 +289,7 @@ export function SettingsPage() {
       setMessage({ key: getBackupErrorKey(error, 'backupRestoreError'), tone: 'error' })
       setProgress({ stage: 'error' })
     } finally {
+      endBusy(busyToken)
       setIsBusy(false)
       setParsedBackup(null)
       resetSelectedFile()

@@ -184,6 +184,7 @@ export const sk = {
   emptyTagDefinitions: "Zatiaľ nie sú vytvorené žiadne štítky.",
   emptyTagPicker: "Pre túto sekciu nie sú dostupné žiadne štítky. Vytvorte ich v časti Štítky.",
   globalSearchPlaceholder: "Hľadať...",
+  searchShortcutHint: "Ctrl+K",
   globalSearchLoading: "Pripravujem vyhľadávanie...",
   globalSearchNoResults: "Nenašli sa žiadne výsledky",
   globalSearchOwners: "Majitelia",

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { Search } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
@@ -21,10 +21,16 @@ export function GlobalSearch() {
   const navigate = useNavigate()
   const { ready, building, version } = useSearchIndexState()
   const rootRef = useRef<HTMLDivElement | null>(null)
+  const inputRef = useRef<HTMLInputElement | null>(null)
+  const openRef = useRef(false)
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [open, setOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState(0)
+
+  useEffect(() => {
+    openRef.current = open
+  }, [open])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -49,6 +55,27 @@ export function GlobalSearch() {
     }
   }, [])
 
+  useEffect(() => {
+    function handleGlobalKeyDown(event: KeyboardEvent): void {
+      const key = event.key.toLowerCase()
+      if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && key === 'k') {
+        event.preventDefault()
+        inputRef.current?.focus()
+        setOpen(true)
+        return
+      }
+
+      if (event.key === 'Escape' && openRef.current) {
+        setOpen(false)
+      }
+    }
+
+    document.addEventListener('keydown', handleGlobalKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleGlobalKeyDown)
+    }
+  }, [])
+
   const trimmedQuery = query.trim()
   const trimmedDebouncedQuery = debouncedQuery.trim()
   const queryIsSearchable = trimmedDebouncedQuery.length >= MIN_QUERY_LENGTH
@@ -58,7 +85,7 @@ export function GlobalSearch() {
   )
   const sections = useMemo(() => buildSections(groupedResults), [groupedResults])
   const flatResults = useMemo(() => sections.flatMap((section) => section.results), [sections])
-  const showDropdown = open && trimmedQuery.length > 0
+  const showDropdown = open
   const showMinChars = showDropdown && trimmedQuery.length < MIN_QUERY_LENGTH
   const waitingForDebounce = trimmedQuery !== trimmedDebouncedQuery
   const loading = showDropdown && !showMinChars && (!ready || (building && !ready) || waitingForDebounce)
@@ -74,7 +101,7 @@ export function GlobalSearch() {
     setDebouncedQuery('')
   }
 
-  function handleKeyDown(event: KeyboardEvent<HTMLInputElement>): void {
+  function handleKeyDown(event: ReactKeyboardEvent<HTMLInputElement>): void {
     if (event.key === 'Escape') {
       setOpen(false)
       return
@@ -109,6 +136,7 @@ export function GlobalSearch() {
     <div ref={rootRef} className="relative w-full max-w-xl">
       <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
       <Input
+        ref={inputRef}
         value={query}
         onChange={(event) => {
           const nextQuery = event.target.value
@@ -118,12 +146,15 @@ export function GlobalSearch() {
         onFocus={() => setOpen(trimmedQuery.length > 0)}
         onKeyDown={handleKeyDown}
         placeholder={t('globalSearchPlaceholder')}
-        className="h-9 border-slate-700 bg-slate-800 pl-9 text-sm text-white placeholder:text-slate-400 focus-visible:ring-slate-400 focus-visible:ring-offset-slate-900"
+        className="h-9 border-slate-700 bg-slate-800 pl-9 pr-16 text-sm text-white placeholder:text-slate-400 focus-visible:ring-slate-400 focus-visible:ring-offset-slate-900"
         role="combobox"
         aria-label={t('globalSearchPlaceholder')}
         aria-expanded={showDropdown}
         aria-controls="global-search-results"
       />
+      <span className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded border border-slate-600 px-1.5 py-0.5 text-[11px] text-slate-300 sm:inline-flex">
+        {t('searchShortcutHint')}
+      </span>
 
       {showDropdown && (
         <div
