@@ -18,6 +18,16 @@ export const appointmentStatusOptions = [
   'no_show',
 ] as const satisfies readonly Appointment['status'][]
 
+export const APPOINTMENT_STATUS_COLORS: Record<
+  Appointment['status'],
+  { bg: string; text: string; bar: string }
+> = {
+  scheduled: { bg: 'bg-blue-50', text: 'text-blue-700', bar: 'bg-blue-500' },
+  done: { bg: 'bg-emerald-50', text: 'text-emerald-700', bar: 'bg-emerald-500' },
+  cancelled: { bg: 'bg-gray-100', text: 'text-gray-600', bar: 'bg-gray-400' },
+  no_show: { bg: 'bg-amber-50', text: 'text-amber-700', bar: 'bg-amber-500' },
+}
+
 export function getAppointmentStatusLabel(status: Appointment['status']): string {
   return t(appointmentStatusKeys[status])
 }

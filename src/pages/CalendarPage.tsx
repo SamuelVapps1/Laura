@@ -15,8 +15,20 @@ import { Button } from '@/components/ui/button'
 import type { Appointment } from '@/db/db'
 import { db } from '@/db/db'
 import { t } from '@/i18n/sk'
-import { toDateInputValue, toMonthInputValue } from '@/lib/appointments'
+import {
+  APPOINTMENT_STATUS_COLORS,
+  getAppointmentStatusLabel,
+  toDateInputValue,
+  toMonthInputValue,
+} from '@/lib/appointments'
 import { cn } from '@/lib/utils'
+
+const STATUS_DOT_PRIORITY = [
+  'scheduled',
+  'done',
+  'no_show',
+  'cancelled',
+] as const satisfies readonly Appointment['status'][]
 
 export function CalendarPage() {
   const navigate = useNavigate()
@@ -75,22 +87,32 @@ export function CalendarPage() {
     setSearchParams(nextParams, { replace: true })
   }, [appointmentId, dateParam, linkedAppointment, monthParam, searchParams, setSearchParams])
 
-  const bookedDates = useMemo(() => {
-    const bookedDateKeys = new Set<string>()
+  const bookedByDate = useMemo(() => {
+    const map = new Map<string, Appointment[]>()
 
     monthAppointments.forEach((appointment) => {
       const startsAt = new Date(appointment.startsAt)
+      if (!isValidDate(startsAt)) return
 
-      if (isValidDate(startsAt)) {
-        bookedDateKeys.add(toDateInputValue(startsAt))
-      }
+      const dateKey = toDateInputValue(startsAt)
+      const existing = map.get(dateKey) ?? []
+      existing.push(appointment)
+      map.set(dateKey, existing)
     })
 
-    return Array.from(bookedDateKeys).flatMap((dateKey) => {
+    map.forEach((appointments) => {
+      appointments.sort((a, b) => a.startsAt.localeCompare(b.startsAt))
+    })
+
+    return map
+  }, [monthAppointments])
+
+  const bookedDates = useMemo(() => {
+    return Array.from(bookedByDate.keys()).flatMap((dateKey) => {
       const parsedDate = parseDate(dateKey)
       return parsedDate ? [parsedDate] : []
     })
-  }, [monthAppointments])
+  }, [bookedByDate])
 
   const handleSelectDate = (date?: Date) => {
     if (!date) return
@@ -194,7 +216,14 @@ export function CalendarPage() {
             showOutsideDays
             fixedWeeks
             modifiers={{ booked: bookedDates }}
-            components={{ DayButton: CalendarDayButton }}
+            components={{
+              DayButton: (props) => (
+                <CalendarDayButton
+                  {...props}
+                  bookedByDate={bookedByDate}
+                />
+              ),
+            }}
             classNames={{
               [UI.Root]: "w-full max-w-full",
               [UI.Months]: "relative w-full max-w-full",
@@ -217,6 +246,7 @@ export function CalendarPage() {
               [SelectionState.selected]: "text-primary-foreground",
             }}
           />
+          <AppointmentStatusLegend />
         </section>
 
         <DayAppointmentsPane
@@ -274,7 +304,22 @@ export function CalendarPage() {
   )
 }
 
-function CalendarDayButton({ className, children, day: _day, modifiers, ...props }: DayButtonProps) {
+type CalendarDayButtonProps = DayButtonProps & {
+  bookedByDate: Map<string, Appointment[]>
+}
+
+function CalendarDayButton({
+  className,
+  children,
+  day,
+  modifiers,
+  bookedByDate,
+  ...props
+}: CalendarDayButtonProps) {
+  const dateKey = toDateInputValue(day.date)
+  const appointments = bookedByDate.get(dateKey) ?? []
+  const statusDots = getStatusDots(appointments)
+
   return (
     <button
       className={cn(
@@ -286,16 +331,43 @@ function CalendarDayButton({ className, children, day: _day, modifiers, ...props
       {...props}
     >
       <span>{children}</span>
-      {modifiers.booked && (
-        <span
-          className={cn(
-            "absolute bottom-1.5 h-1.5 w-1.5 rounded-full bg-primary",
-            modifiers.selected && "bg-primary-foreground"
-          )}
-        />
+      {statusDots.length > 0 && (
+        <span className="absolute bottom-1 flex items-center gap-0.5">
+          {statusDots.map((status) => (
+            <span
+              key={status}
+              className={cn(
+                'h-1.5 w-1.5 rounded-full',
+                APPOINTMENT_STATUS_COLORS[status].bar,
+                modifiers.selected && 'ring-1 ring-white/80'
+              )}
+            />
+          ))}
+        </span>
       )}
     </button>
   )
+}
+
+function AppointmentStatusLegend() {
+  return (
+    <div
+      className="mt-3 flex flex-wrap gap-x-3 gap-y-2 text-xs text-muted-foreground"
+      data-print-hidden="true"
+    >
+      {STATUS_DOT_PRIORITY.map((status) => (
+        <span key={status} className="inline-flex items-center gap-1">
+          <span className={cn('h-2 w-2 rounded-full', APPOINTMENT_STATUS_COLORS[status].bar)} />
+          {getAppointmentStatusLabel(status)}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+function getStatusDots(appointments: Appointment[]): Appointment['status'][] {
+  const present = new Set(appointments.map((appointment) => appointment.status))
+  return STATUS_DOT_PRIORITY.filter((status) => present.has(status)).slice(0, 3)
 }
 
 function parseDateParam(value: string | null): Date | null {

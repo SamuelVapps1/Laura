@@ -6,10 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { type Appointment, db, type Dog, type Owner } from '@/db/db'
 import { t } from '@/i18n/sk'
 import {
+  APPOINTMENT_STATUS_COLORS,
   formatAppointmentPrice,
   formatAppointmentTime,
   getAppointmentStatusLabel,
 } from '@/lib/appointments'
+import { cn } from '@/lib/utils'
 
 type DashboardAppointmentItem = {
   appointment: Appointment
@@ -93,32 +95,38 @@ export function DashboardPage() {
 
             {todayItems.length > 0 ? (
               <div className="space-y-2">
-                {todayItems.map(({ appointment, dog, owner }) => (
-                  <button
-                    key={appointment.id}
-                    type="button"
-                    className="w-full rounded-md border bg-background p-3 text-left transition hover:border-primary/40 hover:bg-accent"
-                    onClick={() => navigate(`/calendar/appt/${appointment.id}`)}
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="font-medium text-gray-900">
-                          {formatAppointmentTime(appointment)} - {dog?.name ?? t('appointmentUnknownDog')}
-                        </p>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                          {owner?.fullName ?? t('appointmentUnknownOwner')}
-                        </p>
+                {todayItems.map(({ appointment, dog, owner }) => {
+                  const statusColors = APPOINTMENT_STATUS_COLORS[appointment.status]
+
+                  return (
+                    <button
+                      key={appointment.id}
+                      type="button"
+                      className="w-full rounded-md border bg-background p-3 text-left transition hover:border-primary/40 hover:bg-accent"
+                      onClick={() => navigate(`/calendar/appt/${appointment.id}`)}
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-medium text-gray-900">
+                            {formatAppointmentTime(appointment)} - {dog?.name ?? t('appointmentUnknownDog')}
+                          </p>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            {owner?.fullName ?? t('appointmentUnknownOwner')}
+                          </p>
+                        </div>
+                        <span
+                          className={cn(
+                            'rounded-full px-2 py-1 text-xs font-medium',
+                            statusColors.bg,
+                            statusColors.text
+                          )}
+                        >
+                          {getAppointmentStatusLabel(appointment.status)}
+                        </span>
                       </div>
-                      <span
-                        className={`rounded-full px-2 py-1 text-xs font-medium ${getStatusBadgeClass(
-                          appointment.status
-                        )}`}
-                      >
-                        {getAppointmentStatusLabel(appointment.status)}
-                      </span>
-                    </div>
-                  </button>
-                ))}
+                    </button>
+                  )
+                })}
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">{t('emptyDayAppointments')}</p>
@@ -150,11 +158,4 @@ export function DashboardPage() {
 
 function isDefined<T>(value: T | undefined): value is T {
   return value !== undefined
-}
-
-function getStatusBadgeClass(status: Appointment['status']): string {
-  if (status === 'scheduled') return 'bg-blue-50 text-blue-700'
-  if (status === 'done') return 'bg-emerald-50 text-emerald-700'
-  if (status === 'cancelled') return 'bg-gray-100 text-gray-600'
-  return 'bg-amber-50 text-amber-700'
 }

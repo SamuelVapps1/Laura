@@ -12,6 +12,7 @@ import { db } from '@/db/db'
 import { getOwnerTipStatsMap } from '@/db/repositories/ownerStats'
 import { t } from '@/i18n/sk'
 import {
+  APPOINTMENT_STATUS_COLORS,
   formatAppointmentPrice,
   formatAppointmentTime,
   getAppointmentStatusLabel,
@@ -150,65 +151,74 @@ export function DayAppointmentsPane({
       <div data-print-hidden="true">
         {items.length > 0 ? (
           <div className="space-y-3">
-            {items.map(({ appointment, dog, owner, ownerTotalTips }) => (
-              <div key={appointment.id} className="relative rounded-md border bg-background shadow-sm">
-                <button
-                  type="button"
-                  className="w-full rounded-md p-3 pr-12 text-left transition hover:border-primary/40 hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                  onClick={() => onAppointmentClick(appointment)}
-                  onContextMenu={(event) => openMenuAtPointer(appointment, event)}
-                  onKeyDown={(event) => {
-                    if ((event.shiftKey && event.key === 'F10') || event.key === 'ContextMenu') {
-                      event.preventDefault()
-                      openMenuFromButton(appointment, event.currentTarget)
-                    }
-                  }}
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div>
-                      <p className="font-medium text-gray-900">
-                        {formatAppointmentTime(appointment)} - {dog?.name ?? t('appointmentUnknownDog')}
-                      </p>
-                      <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                        <span>{owner?.fullName ?? t('appointmentUnknownOwner')}</span>
-                        <OwnerTipBadge compact totalTips={ownerTotalTips} />
-                      </div>
-                    </div>
-                    <span
-                      className={cn(
-                        'rounded-full px-2 py-1 text-xs font-medium',
-                        appointment.status === 'scheduled' && 'bg-blue-50 text-blue-700',
-                        appointment.status === 'done' && 'bg-emerald-50 text-emerald-700',
-                        appointment.status === 'cancelled' && 'bg-gray-100 text-gray-600',
-                        appointment.status === 'no_show' && 'bg-amber-50 text-amber-700'
-                      )}
-                    >
-                      {getAppointmentStatusLabel(appointment.status)}
-                    </span>
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-700">
-                    <span>{appointment.serviceName ?? t('appointmentNoService')}</span>
-                    {appointment.price !== null && (
-                      <span>{formatAppointmentPrice(appointment.price)}</span>
-                    )}
-                  </div>
-                </button>
+            {items.map(({ appointment, dog, owner, ownerTotalTips }) => {
+              const statusColors = APPOINTMENT_STATUS_COLORS[appointment.status]
 
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-2 top-2 h-8 w-8"
-                  aria-label={t('moreAppointmentActions')}
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    openMenuFromButton(appointment, event.currentTarget)
-                  }}
-                >
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
+              return (
+                <div key={appointment.id} className="relative overflow-hidden rounded-md border bg-background shadow-sm">
+                  <span
+                    className={cn(
+                      'absolute left-0 top-0 h-full w-1',
+                      statusColors.bar
+                    )}
+                    data-print-hidden="true"
+                  />
+                  <button
+                    type="button"
+                    className="w-full rounded-md p-3 pr-12 text-left transition hover:border-primary/40 hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                    onClick={() => onAppointmentClick(appointment)}
+                    onContextMenu={(event) => openMenuAtPointer(appointment, event)}
+                    onKeyDown={(event) => {
+                      if ((event.shiftKey && event.key === 'F10') || event.key === 'ContextMenu') {
+                        event.preventDefault()
+                        openMenuFromButton(appointment, event.currentTarget)
+                      }
+                    }}
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <p className="font-medium text-gray-900">
+                          {formatAppointmentTime(appointment)} - {dog?.name ?? t('appointmentUnknownDog')}
+                        </p>
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                          <span>{owner?.fullName ?? t('appointmentUnknownOwner')}</span>
+                          <OwnerTipBadge compact totalTips={ownerTotalTips} />
+                        </div>
+                      </div>
+                      <span
+                        className={cn(
+                          'rounded-full px-2 py-1 text-xs font-medium',
+                          statusColors.bg,
+                          statusColors.text
+                        )}
+                      >
+                        {getAppointmentStatusLabel(appointment.status)}
+                      </span>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-700">
+                      <span>{appointment.serviceName ?? t('appointmentNoService')}</span>
+                      {appointment.price !== null && (
+                        <span>{formatAppointmentPrice(appointment.price)}</span>
+                      )}
+                    </div>
+                  </button>
+
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-2 top-2 h-8 w-8"
+                    aria-label={t('moreAppointmentActions')}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      openMenuFromButton(appointment, event.currentTarget)
+                    }}
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </div>
+              )
+            })}
           </div>
         ) : (
           <EmptyState
