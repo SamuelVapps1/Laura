@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { endOfMonth, startOfMonth, startOfWeek } from 'date-fns'
+import { addDays, addWeeks, endOfMonth, format, startOfMonth, startOfWeek, subDays, subWeeks } from 'date-fns'
 import { sk as skLocale } from 'date-fns/locale'
 import { Plus } from 'lucide-react'
 import { DayFlag, DayPicker, SelectionState, UI, type DayButtonProps } from 'react-day-picker'
@@ -130,6 +130,25 @@ export function CalendarPage() {
     })
   }, [bookedByDate])
 
+  const periodLabel = useMemo(() => {
+    if (view === 'week') {
+      const weekEnd = addDays(selectedWeekStart, 6)
+      return `${format(selectedWeekStart, 'd. M.', { locale: skLocale })} – ${format(weekEnd, 'd. M. yyyy', { locale: skLocale })}`
+    }
+    if (view === 'day') {
+      return format(selectedDate, 'EEEE d. MMMM yyyy', { locale: skLocale })
+    }
+    return null
+  }, [selectedDate, selectedWeekStart, view])
+
+  const setCalendarFocusDate = (nextDate: Date) => {
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set('date', toDateInputValue(nextDate))
+    nextParams.set('month', toMonthInputValue(nextDate))
+    nextParams.set('view', view)
+    setSearchParams(nextParams)
+  }
+
   const handleSelectDate = (date?: Date) => {
     if (!date) return
 
@@ -161,11 +180,31 @@ export function CalendarPage() {
   }
 
   const handleSlotClick = (slotDate: Date) => {
-    const nextParams = new URLSearchParams(searchParams)
-    nextParams.set('date', toDateInputValue(slotDate))
-    nextParams.set('month', toMonthInputValue(slotDate))
-    nextParams.set('view', view)
-    setSearchParams(nextParams)
+    setCalendarFocusDate(slotDate)
+  }
+
+  const handlePreviousPeriod = () => {
+    if (view === 'week') {
+      setCalendarFocusDate(subWeeks(selectedDate, 1))
+      return
+    }
+    if (view === 'day') {
+      setCalendarFocusDate(subDays(selectedDate, 1))
+    }
+  }
+
+  const handleNextPeriod = () => {
+    if (view === 'week') {
+      setCalendarFocusDate(addWeeks(selectedDate, 1))
+      return
+    }
+    if (view === 'day') {
+      setCalendarFocusDate(addDays(selectedDate, 1))
+    }
+  }
+
+  const handleToday = () => {
+    setCalendarFocusDate(new Date())
   }
 
   const handleAppointmentClick = (appointment: Appointment) => {
@@ -254,6 +293,23 @@ export function CalendarPage() {
           </Button>
         ))}
       </div>
+
+      {view !== 'month' && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-3" data-print-hidden="true">
+          <div className="text-sm font-medium text-gray-900">{periodLabel}</div>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={handlePreviousPeriod}>
+              {view === 'week' ? t('calendarPreviousWeek') : t('calendarPreviousDay')}
+            </Button>
+            <Button type="button" variant="outline" size="sm" onClick={handleToday}>
+              {t('calendarToday')}
+            </Button>
+            <Button type="button" variant="outline" size="sm" onClick={handleNextPeriod}>
+              {view === 'week' ? t('calendarNextWeek') : t('calendarNextDay')}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {view === 'month' && (
         <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
