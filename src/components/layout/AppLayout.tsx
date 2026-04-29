@@ -1,12 +1,19 @@
-import { Outlet, useLocation } from "react-router-dom"
-import { BackupWarningBanner } from "@/components/backup/BackupWarningBanner"
-import { TopBar } from "./TopBar"
-import { Sidebar } from "./Sidebar"
-import { SearchProvider } from "@/search/SearchProvider"
+import { useEffect } from 'react'
+import { Outlet, useLocation } from 'react-router-dom'
+
+import { BackupWarningBanner } from '@/components/backup/BackupWarningBanner'
+import { SearchProvider } from '@/search/SearchProvider'
+import { requestPersistentStorageOnce } from '@/lib/storagePersistence'
+import { TopBar } from './TopBar'
+import { Sidebar } from './Sidebar'
 
 export function AppLayout() {
   const location = useLocation()
-  const showBackupWarning = location.pathname === "/" || location.pathname.startsWith("/calendar")
+  const showBackupWarning = location.pathname === '/' || location.pathname.startsWith('/calendar')
+
+  useEffect(() => {
+    void requestPersistentStorageOnce().catch(() => undefined)
+  }, [])
 
   return (
     <SearchProvider>

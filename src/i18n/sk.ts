@@ -1,4 +1,4 @@
-export const sk = {
+﻿export const sk = {
   appName: "Salón pre psov",
   navCalendar: "Kalendár",
   navOwners: "Majitelia",
@@ -302,6 +302,21 @@ export const sk = {
   totalTips: "Celkový tringelt",
   appointmentsWithTips: "Termíny s tringeltom",
   editAppointmentCompletion: "Upraviť ukončenie",
+  appointmentActions: "Akcie terminu",
+  openAppointmentDetail: "Otvorit detail",
+  cancelAppointment: "Zrusit termin",
+  uploadAppointmentPhotos: "Nahrat fotky",
+  moreAppointmentActions: "Dalsie akcie",
+  appointmentPhotosDialogTitle: "Nahrat fotky",
+  appointmentPhotosDialogDescription: "Fotky sa ulozia k tomuto terminu a zobrazia sa v historii psika.",
+  cancelAppointmentTitle: "Zrusit termin?",
+  cancelAppointmentDescription: "Termin bude oznaceny ako zruseny a zostane v historii psika.",
+  appointmentSavedToDogHistory: "Termin zostane ulozeny v historii psika.",
+  storagePersistentStatus: "Trvale ulozisko",
+  storagePersistentGranted: "Povolene",
+  storagePersistentDenied: "Nepovolene",
+  storagePersistentUnsupported: "Nepodporovane",
+  storagePersistentRequested: "Aplikacia poziadala system o trvale ulozisko, aby sa lokalne data neodstranovali pri cisteni miesta.",
 } as const
 
 export type TranslationKey = keyof typeof sk

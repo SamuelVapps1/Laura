@@ -7,7 +7,9 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
 import { AppointmentDetailPanel } from '@/components/appointments/AppointmentDetailPanel'
+import { AppointmentCompletionDialog } from '@/components/appointments/AppointmentCompletionDialog'
 import { AppointmentFormDialog } from '@/components/appointments/AppointmentFormDialog'
+import { AppointmentPhotoDialog } from '@/components/appointments/AppointmentPhotoDialog'
 import { DayAppointmentsPane } from '@/components/appointments/DayAppointmentsPane'
 import { Button } from '@/components/ui/button'
 import type { Appointment } from '@/db/db'
@@ -21,6 +23,10 @@ export function CalendarPage() {
   const { appointmentId } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
   const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [selectedActionAppointment, setSelectedActionAppointment] = useState<Appointment | null>(null)
+  const [completionDialogOpen, setCompletionDialogOpen] = useState(false)
+  const [completionMode, setCompletionMode] = useState<'finish' | 'cancel'>('finish')
+  const [photoDialogOpen, setPhotoDialogOpen] = useState(false)
 
   const dateParam = searchParams.get('date')
   const monthParam = searchParams.get('month')
@@ -109,6 +115,32 @@ export function CalendarPage() {
     })
   }
 
+  const handleAppointmentAction = (
+    appointment: Appointment,
+    action: 'open' | 'finish' | 'cancel' | 'photos'
+  ) => {
+    if (action === 'open') {
+      handleAppointmentClick(appointment)
+      return
+    }
+
+    setSelectedActionAppointment(appointment)
+
+    if (action === 'finish') {
+      setCompletionMode('finish')
+      setCompletionDialogOpen(true)
+      return
+    }
+
+    if (action === 'cancel') {
+      setCompletionMode('cancel')
+      setCompletionDialogOpen(true)
+      return
+    }
+
+    setPhotoDialogOpen(true)
+  }
+
   const handleCloseDetail = (options: { preserveParams?: boolean } = {}) => {
     if (options.preserveParams === false) {
       navigate('/calendar')
@@ -190,6 +222,7 @@ export function CalendarPage() {
         <DayAppointmentsPane
           selectedDate={selectedDate}
           onAppointmentClick={handleAppointmentClick}
+          onAppointmentAction={handleAppointmentAction}
         />
       </div>
 
@@ -210,6 +243,30 @@ export function CalendarPage() {
       <AppointmentDetailPanel
         appointmentId={appointmentId}
         onClose={handleCloseDetail}
+      />
+
+      <AppointmentCompletionDialog
+        open={completionDialogOpen}
+        onOpenChange={(open) => {
+          setCompletionDialogOpen(open)
+          if (!open) {
+            setSelectedActionAppointment(null)
+          }
+        }}
+        appointment={selectedActionAppointment}
+        defaultMode={completionMode}
+        includePhotos={completionMode === 'finish'}
+      />
+
+      <AppointmentPhotoDialog
+        open={photoDialogOpen}
+        onOpenChange={(open) => {
+          setPhotoDialogOpen(open)
+          if (!open) {
+            setSelectedActionAppointment(null)
+          }
+        }}
+        appointment={selectedActionAppointment}
       />
     </div>
   )

@@ -34,6 +34,10 @@ import {
   type BackupPasswordValidationCode,
 } from '@/lib/backupCrypto'
 import { validatePasswordInput } from '@/lib/password'
+import {
+  getStoredPersistentStorageStatus,
+  type StoragePersistStatus,
+} from '@/lib/storagePersistence'
 import { t, type TranslationKey } from '@/i18n/sk'
 
 type StorageInfo = {
@@ -57,6 +61,7 @@ export function SettingsPage() {
   const [message, setMessage] = useState<MessageState>(null)
   const [isBusy, setIsBusy] = useState(false)
   const [storageInfo, setStorageInfo] = useState<StorageInfo>({ supported: true })
+  const [persistentStorageStatus, setPersistentStorageStatus] = useState<StoragePersistStatus | null>(null)
   const [exportDialogOpen, setExportDialogOpen] = useState(false)
   const [exportPassword, setExportPassword] = useState('')
   const [exportPasswordConfirm, setExportPasswordConfirm] = useState('')
@@ -87,6 +92,26 @@ export function SettingsPage() {
   useEffect(() => {
     void refreshStorageEstimate()
   }, [refreshStorageEstimate])
+
+  useEffect(() => {
+    let active = true
+
+    void getStoredPersistentStorageStatus()
+      .then((status) => {
+        if (active) {
+          setPersistentStorageStatus(status)
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setPersistentStorageStatus(null)
+        }
+      })
+
+    return () => {
+      active = false
+    }
+  }, [])
 
   const clearExportPasswordFields = () => {
     setExportPassword('')
@@ -326,7 +351,7 @@ export function SettingsPage() {
           <CardTitle>{t('settingsStorageTitle')}</CardTitle>
         </CardHeader>
         <CardContent>
-          <StorageUsage storageInfo={storageInfo} />
+          <StorageUsage storageInfo={storageInfo} persistentStorageStatus={persistentStorageStatus} />
         </CardContent>
       </Card>
 
@@ -840,7 +865,13 @@ function RestoreConfirmationDialog({
   )
 }
 
-function StorageUsage({ storageInfo }: { storageInfo: StorageInfo }) {
+function StorageUsage({
+  storageInfo,
+  persistentStorageStatus,
+}: {
+  storageInfo: StorageInfo
+  persistentStorageStatus: StoragePersistStatus | null
+}) {
   if (!storageInfo.supported) {
     return <p className="text-sm text-gray-600">{t('storageEstimateUnavailable')}</p>
   }
@@ -866,8 +897,30 @@ function StorageUsage({ storageInfo }: { storageInfo: StorageInfo }) {
       {percentage !== null && (
         <progress className="h-2 w-full overflow-hidden rounded-full" value={percentage} max={100} />
       )}
+      {persistentStorageStatus && (
+        <div className="space-y-1 rounded-md border bg-gray-50 p-3 text-sm">
+          <p>
+            <span className="font-medium text-gray-900">{t('storagePersistentStatus')}: </span>
+            <span className="text-gray-700">{getPersistentStorageStatusLabel(persistentStorageStatus)}</span>
+          </p>
+          <p className="text-xs text-gray-600">{t('storagePersistentRequested')}</p>
+        </div>
+      )}
     </div>
   )
+}
+
+function getPersistentStorageStatusLabel(status: StoragePersistStatus): string {
+  switch (status) {
+    case 'granted':
+      return t('storagePersistentGranted')
+    case 'denied':
+      return t('storagePersistentDenied')
+    case 'unsupported':
+      return t('storagePersistentUnsupported')
+    default:
+      return t('storagePersistentDenied')
+  }
 }
 
 function ProgressBar({ progress }: { progress: BackupProgress | null }) {
