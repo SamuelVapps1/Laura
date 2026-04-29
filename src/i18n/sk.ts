@@ -210,6 +210,7 @@
   errorDogNotFound: "Psík nebol nájdený",
   errorAppointmentNotFound: "Termín nebol nájdený",
   errorCannotDeleteOwnerWithDogs: "Nemôžete odstrániť majiteľa, ktorý má psíkov. Najprv odstráňte všetkých jeho psíkov.",
+  errorCannotDeleteDogWithAppointments: "Nemôžete odstrániť psíka, ktorý má uložené termíny. Najprv odstráňte alebo vyriešte jeho termíny.",
   errorInvalidWeight: "Váha musí byť platné nezáporné číslo",
   errorInvalidDuration: "Trvanie musí byť kladné celé číslo",
   errorInvalidPrice: "Cena musí byť platné nezáporné číslo",

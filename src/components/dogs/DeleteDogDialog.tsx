@@ -26,7 +26,13 @@ export function DeleteDogDialog({ open, onOpenChange, dog, onSuccess }: DeleteDo
       onOpenChange(false)
     } catch (err) {
       const message = (err as Error).message
-      setError(message === DB_ERROR.DOG_NOT_FOUND ? t('errorDogNotFound') : t('validationError'))
+      if (message === DB_ERROR.DOG_NOT_FOUND) {
+        setError(t('errorDogNotFound'))
+      } else if (message === DB_ERROR.DOG_HAS_APPOINTMENTS) {
+        setError(t('errorCannotDeleteDogWithAppointments'))
+      } else {
+        setError(t('validationError'))
+      }
     } finally {
       setIsDeleting(false)
     }

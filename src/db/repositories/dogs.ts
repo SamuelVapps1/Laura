@@ -74,12 +74,20 @@ export async function updateDog(id: string, patch: UpdateDogInput): Promise<Dog>
 }
 
 export async function deleteDog(id: string): Promise<void> {
-  await db.transaction('rw', db.dogs, async () => {
+  await db.transaction('rw', [db.dogs, db.appointments, db.notes, db.tagApplications, db.dogTags], async () => {
     const existing = await db.dogs.get(id)
     if (!existing) {
       throw new Error(DB_ERROR.DOG_NOT_FOUND)
     }
 
+    const appointmentCount = await db.appointments.where('dogId').equals(id).count()
+    if (appointmentCount > 0) {
+      throw new Error(DB_ERROR.DOG_HAS_APPOINTMENTS)
+    }
+
+    await db.notes.delete(['dog', id])
+    await db.tagApplications.where('[entityType+entityId]').equals(['dog', id]).delete()
+    await db.dogTags.where('dogId').equals(id).delete()
     await db.dogs.delete(id)
   })
 }

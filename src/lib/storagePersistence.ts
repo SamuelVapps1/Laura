@@ -1,4 +1,5 @@
-import { getSetting, setSetting } from '@/db/repositories/settings'
+import { db, type AppSetting } from '@/db/db'
+import { getSetting } from '@/db/repositories/settings'
 
 export type StoragePersistStatus = 'granted' | 'denied' | 'unsupported'
 
@@ -7,28 +8,30 @@ const STORAGE_PERSIST_STATUS_KEY = 'storagePersistStatus'
 
 export async function requestPersistentStorageOnce(): Promise<StoragePersistStatus> {
   const requestedAt = await getSetting(STORAGE_PERSIST_REQUESTED_AT_KEY)
+  const existingStatus = await getStoredPersistentStorageStatus()
+
   if (requestedAt) {
-    const existingStatus = await getStoredPersistentStorageStatus()
-    return existingStatus ?? 'denied'
+    if (existingStatus) {
+      return existingStatus
+    }
+
+    const reconciledStatus = await detectPersistentStorageStatusWithoutRequest()
+    await writePersistentStorageState(reconciledStatus, requestedAt.value)
+    return reconciledStatus
   }
 
-  let status: StoragePersistStatus = 'denied'
+  let status: StoragePersistStatus = await detectPersistentStorageStatusWithoutRequest()
 
   try {
-    if (!navigator.storage || typeof navigator.storage.persist !== 'function') {
-      status = 'unsupported'
-    } else {
+    if (navigator.storage && typeof navigator.storage.persist === 'function') {
       status = (await navigator.storage.persist()) ? 'granted' : 'denied'
     }
   } catch {
-    status = 'denied'
+    status = status === 'unsupported' ? 'unsupported' : 'denied'
   }
 
   const now = new Date().toISOString()
-  await Promise.all([
-    setSetting(STORAGE_PERSIST_REQUESTED_AT_KEY, now),
-    setSetting(STORAGE_PERSIST_STATUS_KEY, status),
-  ])
+  await writePersistentStorageState(status, now)
 
   return status
 }
@@ -44,4 +47,32 @@ function parseStorageStatus(value: string | undefined): StoragePersistStatus | n
   }
 
   return null
+}
+
+async function detectPersistentStorageStatusWithoutRequest(): Promise<StoragePersistStatus> {
+  if (!navigator.storage) {
+    return 'unsupported'
+  }
+
+  if (typeof navigator.storage.persisted === 'function') {
+    try {
+      return (await navigator.storage.persisted()) ? 'granted' : 'denied'
+    } catch {
+      return typeof navigator.storage.persist === 'function' ? 'denied' : 'unsupported'
+    }
+  }
+
+  return typeof navigator.storage.persist === 'function' ? 'denied' : 'unsupported'
+}
+
+async function writePersistentStorageState(status: StoragePersistStatus, requestedAt: string): Promise<void> {
+  const updatedAt = new Date().toISOString()
+  const entries: AppSetting[] = [
+    { key: STORAGE_PERSIST_REQUESTED_AT_KEY, value: requestedAt, updatedAt },
+    { key: STORAGE_PERSIST_STATUS_KEY, value: status, updatedAt },
+  ]
+
+  await db.transaction('rw', db.appSettings, async () => {
+    await db.appSettings.bulkPut(entries)
+  })
 }

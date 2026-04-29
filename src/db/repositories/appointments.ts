@@ -121,14 +121,22 @@ export async function updateAppointment(id: EntityId, patch: UpdateAppointmentIn
 }
 
 export async function deleteAppointment(id: EntityId): Promise<void> {
-  await db.transaction('rw', db.appointments, async () => {
-    const existing = await db.appointments.get(id)
-    if (!existing) {
-      throw new Error(DB_ERROR.APPOINTMENT_NOT_FOUND)
-    }
+  await db.transaction(
+    'rw',
+    [db.appointments, db.notes, db.tagApplications, db.photoSessions, db.photos],
+    async () => {
+      const existing = await db.appointments.get(id)
+      if (!existing) {
+        throw new Error(DB_ERROR.APPOINTMENT_NOT_FOUND)
+      }
 
-    await db.appointments.delete(id)
-  })
+      await db.notes.delete(['appointment', id])
+      await db.tagApplications.where('[entityType+entityId]').equals(['appointment', id]).delete()
+      await db.photos.where('appointmentId').equals(id).delete()
+      await db.photoSessions.where('appointmentId').equals(id).delete()
+      await db.appointments.delete(id)
+    }
+  )
 }
 
 export async function getAppointmentById(id: EntityId): Promise<Appointment | undefined> {
