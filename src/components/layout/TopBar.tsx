@@ -3,10 +3,12 @@ import { useNavigate } from "react-router-dom"
 
 import { useAuth } from "@/auth/AuthProvider"
 import { GlobalSearch } from "@/components/search/GlobalSearch"
+import { useSalonName } from "@/hooks/useSalonName"
 import { t } from "@/i18n/sk"
 
 export function TopBar() {
   const { passwordEnabled, lock } = useAuth()
+  const salonName = useSalonName()
   const navigate = useNavigate()
 
   const handleLock = () => {
@@ -19,7 +21,7 @@ export function TopBar() {
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex shrink-0 items-center gap-2">
           <span className="text-xl">🐾</span>
-          <span className="text-lg font-bold">{t("appName")}</span>
+          <span className="text-lg font-bold">{salonName}</span>
         </div>
         <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
           <GlobalSearch />

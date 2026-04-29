@@ -53,6 +53,7 @@ import {
   getStoredPersistentStorageStatus,
   type StoragePersistStatus,
 } from '@/lib/storagePersistence'
+import { useSalonName } from '@/hooks/useSalonName'
 import { t, type TranslationKey } from '@/i18n/sk'
 
 type StorageInfo = {
@@ -93,6 +94,7 @@ function SettingsCardHeader({
 export function SettingsPage() {
   const auth = useAuth()
   const { startBusy, endBusy } = useAppBusy()
+  const displaySalonName = useSalonName()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [parsedBackup, setParsedBackup] = useState<ParsedBackupPreview | null>(null)
@@ -543,7 +545,7 @@ export function SettingsPage() {
           description={t('settingsAboutDescription')}
         />
         <CardContent className="space-y-2 text-sm text-gray-600">
-          <p>{t('appName')}</p>
+          <p>{displaySalonName}</p>
           <p>
             {t('backupFormatVersion')}: {BACKUP_VERSION}
           </p>

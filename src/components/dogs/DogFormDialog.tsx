@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 
 import { DogTagSelector } from '@/components/dogs/DogTagSelector'
 import { OwnerSearchSelect } from '@/components/dogs/OwnerSearchSelect'
@@ -289,7 +290,12 @@ export function DogFormDialog({
             </div>
 
             <div className="grid gap-2 border-t border-border pt-4">
-              <Label>{t('labelDogTags')}</Label>
+              <div className="flex items-center justify-between gap-3">
+                <Label>{t('labelDogTags')}</Label>
+                <Button asChild variant="ghost" size="sm" className="h-auto px-2 py-1 text-xs">
+                  <Link to="/tags">{t('manageTags')}</Link>
+                </Button>
+              </div>
               <DogTagSelector selectedTagIds={selectedTagIds} onChange={setSelectedTagIds} disabled={isSaving} />
             </div>
 

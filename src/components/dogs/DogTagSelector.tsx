@@ -17,10 +17,10 @@ export function DogTagSelector({ selectedTagIds, onChange, disabled }: DogTagSel
       emptyState={
         <div className="space-y-2">
           <p className="text-sm text-muted-foreground">{t('noDogTagsAvailable')}</p>
-          <p className="text-xs text-muted-foreground">{t('dogTagsHint')}</p>
+          <p className="text-xs text-muted-foreground">{t('dogTagsScopeHint')}</p>
         </div>
       }
-      footer={<p className="text-xs text-muted-foreground">{t('dogTagsHint')}</p>}
+      footer={<p className="text-xs text-muted-foreground">{t('dogTagsScopeHint')}</p>}
     />
   )
 }
