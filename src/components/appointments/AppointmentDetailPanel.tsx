@@ -171,6 +171,7 @@ export function AppointmentDetailPanel({ appointmentId, onClose }: AppointmentDe
               </DisclosureSection>
 
               <DisclosureSection title={t('appointmentTags')} openLabel={t('openTags')}>
+                {/* Appointment tags are managed through TagPicker; form dialog has no direct tag selector. */}
                 <TagPicker entityType="appointment" entityId={appointment.id} />
               </DisclosureSection>
 

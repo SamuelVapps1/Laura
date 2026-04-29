@@ -526,10 +526,7 @@ export async function restoreBackup(
 
       if (data.tagDefinitions.length > 0) {
         await db.tagDefinitions.bulkAdd(
-          data.tagDefinitions.map((definition) => ({
-            ...definition,
-            isActive: definition.isActive ?? true,
-          }))
+          data.tagDefinitions.map((definition) => normalizeBackupTagDefinition(definition))
         )
       }
       current += 1
@@ -864,14 +861,12 @@ function validateTagDefinition(value: unknown): asserts value is TagDefinition {
     }
   })
 
-  if (record.isActive === undefined) {
-    record.isActive = true
-    return
-  }
-
-  if (typeof record.isActive !== 'boolean') {
+  if (record.isActive !== undefined && typeof record.isActive !== 'boolean') {
     throw new BackupError('invalid_file')
   }
+
+  const normalized = normalizeBackupTagDefinition(record as unknown as TagDefinition)
+  record.isActive = normalized.isActive
 }
 
 function validateTagApplication(value: unknown): asserts value is TagApplication {
@@ -1092,4 +1087,11 @@ function ensureUniqueValues(values: string[]): void {
 
     seen.add(value)
   })
+}
+
+function normalizeBackupTagDefinition(definition: TagDefinition): TagDefinition {
+  return {
+    ...definition,
+    isActive: definition.isActive ?? true,
+  }
 }

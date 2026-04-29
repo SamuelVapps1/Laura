@@ -3,7 +3,12 @@ import { useLiveQuery } from 'dexie-react-hooks'
 
 import { db } from '@/db/db'
 import { t } from '@/i18n/sk'
-import { getReadableTagTextColor } from '@/lib/tags'
+import {
+  getReadableTagTextColor,
+  getVisibleScopedTagDefinitions,
+  isTagDefinitionActive,
+  sortTagDefinitionsByLabel,
+} from '@/lib/tags'
 import { cn } from '@/lib/utils'
 
 type DogTagSelectorProps = {
@@ -17,10 +22,7 @@ export function DogTagSelector({ selectedTagIds, onChange, disabled }: DogTagSel
     async () => {
       const all = await db.tagDefinitions.toArray()
       const selectedSet = new Set(selectedTagIds)
-      const scoped = all.filter((definition) => definition.scopes.includes('dog'))
-      return scoped
-        .filter((definition) => definition.isActive !== false || selectedSet.has(definition.id))
-        .sort((a, b) => a.label.localeCompare(b.label, 'sk'))
+      return getVisibleScopedTagDefinitions(all, 'dog', selectedSet)
     },
     [selectedTagIds],
     []
@@ -28,15 +30,13 @@ export function DogTagSelector({ selectedTagIds, onChange, disabled }: DogTagSel
 
   const selectedSet = useMemo(() => new Set(selectedTagIds), [selectedTagIds])
   const sortedTags = useMemo(() => {
-    const collator = new Intl.Collator('sk')
-    return [...visibleDogTags].sort((first, second) => {
-      const firstSelected = selectedSet.has(first.id)
-      const secondSelected = selectedSet.has(second.id)
-      if (firstSelected !== secondSelected) {
-        return firstSelected ? -1 : 1
-      }
-      return collator.compare(first.label, second.label)
-    })
+    const selected = sortTagDefinitionsByLabel(
+      visibleDogTags.filter((definition) => selectedSet.has(definition.id))
+    )
+    const unselected = sortTagDefinitionsByLabel(
+      visibleDogTags.filter((definition) => !selectedSet.has(definition.id))
+    )
+    return [...selected, ...unselected]
   }, [visibleDogTags, selectedSet])
 
   const toggleTag = (tagId: string) => {
@@ -44,7 +44,7 @@ export function DogTagSelector({ selectedTagIds, onChange, disabled }: DogTagSel
     const targetTag = visibleDogTags.find((tag) => tag.id === tagId)
     if (!targetTag) return
 
-    if (targetTag.isActive === false && !selectedSet.has(tagId)) {
+    if (!isTagDefinitionActive(targetTag) && !selectedSet.has(tagId)) {
       return
     }
 

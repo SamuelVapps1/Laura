@@ -6,6 +6,7 @@ import { db } from '@/db/db'
 import { normalizeSearchText } from '@/db/search'
 import { formatAppointmentDateTime, getAppointmentStatusLabel, toDateInputValue } from '@/lib/appointments'
 import { t } from '@/i18n/sk'
+import { isTagDefinitionActive } from '@/lib/tags'
 
 export type SearchEntityType = 'owner' | 'dog' | 'appointment' | 'tag'
 
@@ -278,7 +279,7 @@ function buildSearchIndex(snapshot: SearchSnapshot): void {
 
   for (const application of snapshot.tagApplications) {
     const tag = tagMap.get(application.tagId)
-    if (!tag || tag.isActive === false) continue
+    if (!tag || !isTagDefinitionActive(tag)) continue
 
     const tagResult = buildTagResult(application, tag, ownerMap, dogMap, appointmentMap)
     if (tagResult) {

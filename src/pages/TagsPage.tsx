@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import type { TagDefinition } from '@/db/db'
 import { db } from '@/db/db'
 import { t } from '@/i18n/sk'
+import { isTagDefinitionActive } from '@/lib/tags'
 
 export function TagsPage() {
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -21,7 +22,7 @@ export function TagsPage() {
     [],
     []
   )
-  const visibleTags = showInactiveTags ? tags : tags.filter((tag) => tag.isActive !== false)
+  const visibleTags = showInactiveTags ? tags : tags.filter((tag) => isTagDefinitionActive(tag))
 
   const handleAdd = () => {
     setEditingTag(undefined)

@@ -1,4 +1,4 @@
-import type { TagScope } from '@/db/db'
+import type { EntityId, TagDefinition, TagScope } from '@/db/db'
 import { t } from '@/i18n/sk'
 
 export const TAG_COLOR_PALETTE = [
@@ -37,4 +37,25 @@ export function getReadableTagTextColor(color: string): "#ffffff" | "#111827" {
   const luminance = (0.299 * red + 0.587 * green + 0.114 * blue) / 255
 
   return luminance > 0.58 ? "#111827" : "#ffffff"
+}
+
+export function isTagDefinitionActive(tag: Pick<TagDefinition, 'isActive'>): boolean {
+  return tag.isActive !== false
+}
+
+export function getVisibleScopedTagDefinitions(
+  definitions: TagDefinition[],
+  scope: TagScope,
+  appliedTagIds: Set<EntityId> = new Set()
+): TagDefinition[] {
+  return definitions.filter(
+    (definition) =>
+      definition.scopes.includes(scope) &&
+      (isTagDefinitionActive(definition) || appliedTagIds.has(definition.id))
+  )
+}
+
+export function sortTagDefinitionsByLabel(definitions: TagDefinition[]): TagDefinition[] {
+  const collator = new Intl.Collator('sk')
+  return [...definitions].sort((first, second) => collator.compare(first.label, second.label))
 }

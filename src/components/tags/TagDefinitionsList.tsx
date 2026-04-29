@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import type { TagDefinition } from '@/db/db'
 import { t } from '@/i18n/sk'
-import { getTagScopeLabel } from '@/lib/tags'
+import { getTagScopeLabel, isTagDefinitionActive } from '@/lib/tags'
 
 interface TagDefinitionsListProps {
   tags: TagDefinition[]
@@ -31,52 +31,57 @@ export function TagDefinitionsList({ tags, onEdit, onDelete }: TagDefinitionsLis
               <TableHead>{t('labelTagLabel')}</TableHead>
               <TableHead>{t('labelTagDescription')}</TableHead>
               <TableHead>{t('labelTagColor')}</TableHead>
-              <TableHead>{t('labelTagActive')}</TableHead>
+              <TableHead>{t('labelTagStatus')}</TableHead>
               <TableHead>{t('labelTagScopes')}</TableHead>
               <TableHead className="text-right">{t('columnActions')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {tags.map((tag) => (
-              <TableRow key={tag.id} className={tag.isActive === false ? 'opacity-70' : undefined}>
-                <TableCell className="font-medium">{tag.label}</TableCell>
-                <TableCell>{tag.description || '-'}</TableCell>
-                <TableCell>
-                  <span
-                    className="inline-flex h-5 w-5 rounded-full border"
-                    style={{ backgroundColor: tag.color }}
-                  />
-                </TableCell>
-                <TableCell>
-                  {tag.isActive === false ? (
-                    <span className="rounded-md border px-2 py-1 text-xs font-medium text-muted-foreground">
-                      {t('tagInactiveBadge')}
-                    </span>
-                  ) : (
-                    '-'
-                  )}
-                </TableCell>
-                <TableCell>
-                  <div className="flex flex-wrap gap-1">
-                    {tag.scopes.map((scope) => (
-                      <span key={scope} className="rounded-md bg-muted px-2 py-1 text-xs font-medium">
-                        {getTagScopeLabel(scope)}
+            {tags.map((tag) => {
+              const isActive = isTagDefinitionActive(tag)
+              return (
+                <TableRow key={tag.id} className={isActive ? undefined : 'opacity-70'}>
+                  <TableCell className="font-medium">{tag.label}</TableCell>
+                  <TableCell>{tag.description || '-'}</TableCell>
+                  <TableCell>
+                    <span
+                      className="inline-flex h-5 w-5 rounded-full border"
+                      style={{ backgroundColor: tag.color }}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    {isActive ? (
+                      <span className="rounded-md border px-2 py-1 text-xs font-medium text-emerald-700">
+                        {t('tagActiveBadge')}
                       </span>
-                    ))}
-                  </div>
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex justify-end gap-2">
-                    <Button variant="outline" size="sm" onClick={() => onEdit(tag)}>
-                      {t('buttonEdit')}
-                    </Button>
-                    <Button variant="destructive" size="sm" onClick={() => onDelete(tag)}>
-                      {t('buttonDelete')}
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
+                    ) : (
+                      <span className="rounded-md border px-2 py-1 text-xs font-medium text-muted-foreground">
+                        {t('tagInactiveBadge')}
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1">
+                      {tag.scopes.map((scope) => (
+                        <span key={scope} className="rounded-md bg-muted px-2 py-1 text-xs font-medium">
+                          {getTagScopeLabel(scope)}
+                        </span>
+                      ))}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      <Button variant="outline" size="sm" onClick={() => onEdit(tag)}>
+                        {t('buttonEdit')}
+                      </Button>
+                      <Button variant="destructive" size="sm" onClick={() => onDelete(tag)}>
+                        {t('buttonDelete')}
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )
+            })}
           </TableBody>
         </Table>
       </CardContent>

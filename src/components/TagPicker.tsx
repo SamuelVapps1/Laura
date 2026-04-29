@@ -6,7 +6,12 @@ import { db } from '@/db/db'
 import { DB_ERROR } from '@/db/errors'
 import { toggleTagApplication } from '@/db/repositories/tags'
 import { t } from '@/i18n/sk'
-import { getReadableTagTextColor } from '@/lib/tags'
+import {
+  getReadableTagTextColor,
+  getVisibleScopedTagDefinitions,
+  isTagDefinitionActive,
+  sortTagDefinitionsByLabel,
+} from '@/lib/tags'
 import { cn } from '@/lib/utils'
 
 interface TagPickerProps {
@@ -16,6 +21,7 @@ interface TagPickerProps {
 
 export function TagPicker({ entityType, entityId }: TagPickerProps) {
   const [error, setError] = useState<string | null>(null)
+  const [pendingTagIds, setPendingTagIds] = useState<Set<string>>(() => new Set())
 
   const allTagDefinitions = useLiveQuery(
     () => db.tagDefinitions.toArray(),
@@ -35,28 +41,41 @@ export function TagPicker({ entityType, entityId }: TagPickerProps) {
   )
 
   const visibleTagDefinitions = useMemo(() => {
-    const scopedDefinitions = allTagDefinitions.filter((definition) => definition.scopes.includes(entityType))
-    return scopedDefinitions.filter((definition) => definition.isActive !== false || appliedTagIds.has(definition.id))
+    return getVisibleScopedTagDefinitions(allTagDefinitions, entityType, appliedTagIds)
   }, [allTagDefinitions, entityType, appliedTagIds])
 
   const sortedTagDefinitions = useMemo(() => {
-    const collator = new Intl.Collator('sk')
-    return [...visibleTagDefinitions].sort((first, second) => {
-      const firstApplied = appliedTagIds.has(first.id)
-      const secondApplied = appliedTagIds.has(second.id)
-      if (firstApplied !== secondApplied) {
-        return firstApplied ? -1 : 1
-      }
-      return collator.compare(first.label, second.label)
-    })
+    const applied = sortTagDefinitionsByLabel(
+      visibleTagDefinitions.filter((definition) => appliedTagIds.has(definition.id))
+    )
+    const unapplied = sortTagDefinitionsByLabel(
+      visibleTagDefinitions.filter((definition) => !appliedTagIds.has(definition.id))
+    )
+    return [...applied, ...unapplied]
   }, [visibleTagDefinitions, appliedTagIds])
 
   const handleToggle = async (tagId: string) => {
+    if (pendingTagIds.has(tagId)) return
+    const tag = allTagDefinitions.find((definition) => definition.id === tagId)
+    if (!tag) return
+
+    if (!isTagDefinitionActive(tag)) {
+      const existing = await db.tagApplications.get([tagId, entityType, entityId])
+      if (!existing) return
+    }
+
     setError(null)
+    setPendingTagIds((current) => new Set(current).add(tagId))
     try {
       await toggleTagApplication(entityType, entityId, tagId)
     } catch (err) {
       setError(getTagPickerError(err))
+    } finally {
+      setPendingTagIds((current) => {
+        const next = new Set(current)
+        next.delete(tagId)
+        return next
+      })
     }
   }
 
@@ -69,13 +88,15 @@ export function TagPicker({ entityType, entityId }: TagPickerProps) {
       <div className="flex flex-wrap gap-2">
         {sortedTagDefinitions.map((tag) => {
           const isApplied = appliedTagIds.has(tag.id)
+          const isPending = pendingTagIds.has(tag.id)
           return (
             <button
               key={tag.id}
               type="button"
+              disabled={isPending}
               title={tag.description ?? undefined}
               className={cn(
-                "inline-flex items-center gap-1 rounded-full border px-3 py-1 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                "inline-flex items-center gap-1 rounded-full border px-3 py-1 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-70"
               )}
               style={{
                 backgroundColor: isApplied ? tag.color : 'transparent',
