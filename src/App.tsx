@@ -12,6 +12,7 @@ import { DogsPage } from "./pages/DogsPage"
 import { DogDetailPage } from "./pages/DogDetailPage"
 import { DogGalleryPage } from "./pages/DogGalleryPage"
 import { TagsPage } from "./pages/TagsPage"
+import { ReportsPage } from "./pages/ReportsPage"
 import { SettingsPage } from "./pages/SettingsPage"
 import { LoginPage } from "./pages/LoginPage"
 
@@ -73,6 +74,10 @@ const router = createBrowserRouter([
       {
         path: "tags",
         element: <TagsPage />,
+      },
+      {
+        path: "reports",
+        element: <ReportsPage />,
       },
       {
         path: "settings",

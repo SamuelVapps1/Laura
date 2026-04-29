@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom"
-import { Calendar, Users, Dog, Tag, Settings, LayoutDashboard } from "lucide-react"
+import { BarChart3, Calendar, Users, Dog, Tag, Settings, LayoutDashboard } from "lucide-react"
 import { t } from "@/i18n/sk"
 import { cn } from "@/lib/utils"
 
@@ -9,6 +9,7 @@ const navItems = [
   { href: "/owners", label: t("navOwners"), icon: Users },
   { href: "/dogs", label: t("navDogs"), icon: Dog },
   { href: "/tags", label: t("navTags"), icon: Tag },
+  { href: "/reports", label: t("navReports"), icon: BarChart3 },
   { href: "/settings", label: t("navSettings"), icon: Settings },
 ]
 

@@ -28,11 +28,14 @@
   }
 
   [data-print-section='day-schedule'],
-  [data-print-section='day-schedule'] * {
+  [data-print-section='day-schedule'] *,
+  [data-print-section='business-report'],
+  [data-print-section='business-report'] * {
     visibility: visible;
   }
 
-  [data-print-section='day-schedule'] {
+  [data-print-section='day-schedule'],
+  [data-print-section='business-report'] {
     display: block !important;
     position: absolute;
     left: 0;
@@ -42,7 +45,8 @@
     background: #ffffff !important;
   }
 
-  [data-print-section='day-schedule'] header {
+  [data-print-section='day-schedule'] header,
+  [data-print-section='business-report'] header {
     display: block !important;
     margin-bottom: 8mm;
     break-after: avoid;
@@ -74,5 +78,26 @@
     page-break-inside: avoid;
     border: 1px solid #d1d5db !important;
     background: #ffffff !important;
+  }
+
+  [data-print-section='business-report'] section,
+  [data-print-section='business-report'] table,
+  [data-print-section='business-report'] tr,
+  [data-print-section='business-report'] .rounded-md,
+  [data-print-section='business-report'] .border {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  [data-print-section='business-report'] table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  [data-print-section='business-report'] th,
+  [data-print-section='business-report'] td {
+    border-bottom: 1px solid #d1d5db !important;
+    padding: 2mm !important;
+    color: #000000 !important;
   }
 }
