@@ -5,14 +5,13 @@ import type { TagScope } from '@/db/db'
 import { db } from '@/db/db'
 import { DB_ERROR } from '@/db/errors'
 import { removeTag, toggleTagApplication } from '@/db/repositories/tags'
+import { TagChoiceChip } from '@/components/tags/TagChoiceChip'
 import { t } from '@/i18n/sk'
 import {
-  getReadableTagTextColor,
-  getVisibleScopedTagDefinitions,
+  canToggleTagDefinition,
+  getSortedVisibleScopedTagDefinitions,
   isTagDefinitionActive,
-  sortTagDefinitionsByLabel,
 } from '@/lib/tags'
-import { cn } from '@/lib/utils'
 
 interface TagPickerProps {
   entityType: TagScope
@@ -41,19 +40,9 @@ export function TagPicker({ entityType, entityId }: TagPickerProps) {
     [applications]
   )
 
-  const visibleTagDefinitions = useMemo(() => {
-    return getVisibleScopedTagDefinitions(allTagDefinitions, entityType, appliedTagIds)
-  }, [allTagDefinitions, entityType, appliedTagIds])
-
   const sortedTagDefinitions = useMemo(() => {
-    const applied = sortTagDefinitionsByLabel(
-      visibleTagDefinitions.filter((definition) => appliedTagIds.has(definition.id))
-    )
-    const unapplied = sortTagDefinitionsByLabel(
-      visibleTagDefinitions.filter((definition) => !appliedTagIds.has(definition.id))
-    )
-    return [...applied, ...unapplied]
-  }, [visibleTagDefinitions, appliedTagIds])
+    return getSortedVisibleScopedTagDefinitions(allTagDefinitions, entityType, appliedTagIds)
+  }, [allTagDefinitions, entityType, appliedTagIds])
 
   const handleToggle = async (tagId: string) => {
     const pendingKey = getPendingKey(entityType, entityId, tagId)
@@ -67,6 +56,9 @@ export function TagPicker({ entityType, entityId }: TagPickerProps) {
 
     try {
       if (!tag) return
+
+      const isApplied = appliedTagIds.has(tagId)
+      if (!canToggleTagDefinition(tag, isApplied)) return
 
       if (!isTagDefinitionActive(tag)) {
         const existing = await db.tagApplications.get([tagId, entityType, entityId])
@@ -104,28 +96,17 @@ export function TagPicker({ entityType, entityId }: TagPickerProps) {
           const isApplied = appliedTagIds.has(tag.id)
           const isPending = pendingTagKeys.has(getPendingKey(entityType, entityId, tag.id))
           return (
-            <button
+            <TagChoiceChip
               key={tag.id}
-              type="button"
+              label={tag.label}
+              color={tag.color}
+              selected={isApplied}
+              inactive={tag.isActive === false}
               disabled={isPending}
               title={tag.description ?? undefined}
-              className={cn(
-                "inline-flex items-center gap-1 rounded-full border px-3 py-1 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-70"
-              )}
-              style={{
-                backgroundColor: isApplied ? tag.color : 'transparent',
-                borderColor: tag.color,
-                color: isApplied ? getReadableTagTextColor(tag.color) : tag.color,
-              }}
+              className="disabled:opacity-70"
               onClick={() => void handleToggle(tag.id)}
-            >
-              <span>{tag.label}</span>
-              {tag.isActive === false && (
-                <span className="rounded-sm border border-current/40 px-1 py-0.5 text-[10px] leading-none">
-                  {t('tagInactiveBadge')}
-                </span>
-              )}
-            </button>
+            />
           )
         })}
       </div>

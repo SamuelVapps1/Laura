@@ -43,6 +43,13 @@ export function isTagDefinitionActive(tag: Pick<TagDefinition, 'isActive'>): boo
   return tag.isActive !== false
 }
 
+export function canToggleTagDefinition(
+  tag: Pick<TagDefinition, 'isActive'>,
+  isSelected: boolean
+): boolean {
+  return isTagDefinitionActive(tag) || isSelected
+}
+
 export function getVisibleScopedTagDefinitions(
   definitions: TagDefinition[],
   scope: TagScope,
@@ -58,4 +65,22 @@ export function getVisibleScopedTagDefinitions(
 export function sortTagDefinitionsByLabel(definitions: TagDefinition[]): TagDefinition[] {
   const collator = new Intl.Collator('sk')
   return [...definitions].sort((first, second) => collator.compare(first.label, second.label))
+}
+
+export function getSortedVisibleScopedTagDefinitions(
+  definitions: TagDefinition[],
+  scope: TagScope,
+  selectedTagIds: Iterable<EntityId> = []
+): TagDefinition[] {
+  const selectedSet = new Set(selectedTagIds)
+  const visible = getVisibleScopedTagDefinitions(definitions, scope, selectedSet)
+
+  const selected = sortTagDefinitionsByLabel(
+    visible.filter((definition) => selectedSet.has(definition.id))
+  )
+  const unselected = sortTagDefinitionsByLabel(
+    visible.filter((definition) => !selectedSet.has(definition.id))
+  )
+
+  return [...selected, ...unselected]
 }
