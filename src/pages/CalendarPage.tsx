@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { endOfMonth, startOfMonth } from 'date-fns'
+import { endOfMonth, startOfMonth, startOfWeek } from 'date-fns'
 import { sk as skLocale } from 'date-fns/locale'
 import { Plus } from 'lucide-react'
 import { DayFlag, DayPicker, SelectionState, UI, type DayButtonProps } from 'react-day-picker'
@@ -10,7 +10,9 @@ import { AppointmentDetailPanel } from '@/components/appointments/AppointmentDet
 import { AppointmentCompletionDialog } from '@/components/appointments/AppointmentCompletionDialog'
 import { AppointmentFormDialog } from '@/components/appointments/AppointmentFormDialog'
 import { AppointmentPhotoDialog } from '@/components/appointments/AppointmentPhotoDialog'
+import { DayTimeGrid } from '@/components/appointments/DayTimeGrid'
 import { DayAppointmentsPane } from '@/components/appointments/DayAppointmentsPane'
+import { WeekTimeGrid } from '@/components/appointments/WeekTimeGrid'
 import { Button } from '@/components/ui/button'
 import type { Appointment } from '@/db/db'
 import { db } from '@/db/db'
@@ -30,6 +32,14 @@ const STATUS_DOT_PRIORITY = [
   'cancelled',
 ] as const satisfies readonly Appointment['status'][]
 
+type CalendarView = 'month' | 'week' | 'day'
+
+const CALENDAR_VIEW_OPTIONS = [
+  { value: 'month', labelKey: 'calendarViewMonth' },
+  { value: 'week', labelKey: 'calendarViewWeek' },
+  { value: 'day', labelKey: 'calendarViewDay' },
+] as const
+
 export function CalendarPage() {
   const navigate = useNavigate()
   const { appointmentId } = useParams()
@@ -42,6 +52,8 @@ export function CalendarPage() {
 
   const dateParam = searchParams.get('date')
   const monthParam = searchParams.get('month')
+  const viewParam = searchParams.get('view')
+  const view = useMemo(() => parseViewParam(viewParam), [viewParam])
 
   const selectedDate = useMemo(() => parseDateParam(dateParam) ?? new Date(), [dateParam])
   const visibleMonth = useMemo(
@@ -51,6 +63,10 @@ export function CalendarPage() {
 
   const monthStartIso = startOfMonth(visibleMonth).toISOString()
   const monthEndIso = endOfMonth(visibleMonth).toISOString()
+  const selectedWeekStart = useMemo(
+    () => startOfWeek(selectedDate, { weekStartsOn: 1 }),
+    [selectedDate]
+  )
 
   const monthAppointments = useLiveQuery(
     () => db.appointments
@@ -123,9 +139,32 @@ export function CalendarPage() {
     setSearchParams(nextParams)
   }
 
+  const handleViewChange = (nextView: CalendarView) => {
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set('view', nextView)
+
+    if (!nextParams.get('date')) {
+      nextParams.set('date', toDateInputValue(selectedDate))
+    }
+
+    if (!nextParams.get('month')) {
+      nextParams.set('month', toMonthInputValue(selectedDate))
+    }
+
+    setSearchParams(nextParams)
+  }
+
   const handleMonthChange = (month: Date) => {
     const nextParams = new URLSearchParams(searchParams)
     nextParams.set('month', toMonthInputValue(month))
+    setSearchParams(nextParams)
+  }
+
+  const handleSlotClick = (slotDate: Date) => {
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set('date', toDateInputValue(slotDate))
+    nextParams.set('month', toMonthInputValue(slotDate))
+    nextParams.set('view', view)
     setSearchParams(nextParams)
   }
 
@@ -203,59 +242,98 @@ export function CalendarPage() {
         </Button>
       </div>
 
-      <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
-        <section className="min-w-0 overflow-hidden rounded-lg border bg-card p-3 shadow-sm sm:p-4 print:hidden" data-print-hidden="true">
-          <DayPicker
-            mode="single"
-            selected={selectedDate}
-            month={visibleMonth}
-            onSelect={handleSelectDate}
-            onMonthChange={handleMonthChange}
-            locale={skLocale}
-            weekStartsOn={1}
-            showOutsideDays
-            fixedWeeks
-            modifiers={{ booked: bookedDates }}
-            components={{
-              DayButton: (props) => (
-                <CalendarDayButton
-                  {...props}
-                  bookedByDate={bookedByDate}
-                />
-              ),
-            }}
-            classNames={{
-              [UI.Root]: "w-full max-w-full",
-              [UI.Months]: "relative w-full max-w-full",
-              [UI.Month]: "space-y-4",
-              [UI.MonthCaption]: "flex h-10 items-center justify-center",
-              [UI.CaptionLabel]: "text-base font-semibold text-gray-900",
-              [UI.Nav]: "absolute right-0 top-1 flex items-center gap-1 sm:right-1",
-              [UI.PreviousMonthButton]: "inline-flex h-8 w-8 items-center justify-center rounded-md border border-input bg-background text-sm hover:bg-accent disabled:opacity-40",
-              [UI.NextMonthButton]: "inline-flex h-8 w-8 items-center justify-center rounded-md border border-input bg-background text-sm hover:bg-accent disabled:opacity-40",
-              [UI.Chevron]: "h-4 w-4",
-              [UI.MonthGrid]: "w-full table-fixed border-collapse",
-              [UI.Weekdays]: "grid grid-cols-7",
-              [UI.Weekday]: "py-2 text-center text-xs font-medium text-muted-foreground",
-              [UI.Weeks]: "block",
-              [UI.Week]: "grid grid-cols-7",
-              [UI.Day]: "flex aspect-square min-w-0 items-center justify-center p-0",
-              [UI.DayButton]: "relative flex h-9 w-9 items-center justify-center rounded-md text-sm transition-colors hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 sm:h-10 sm:w-10",
-              [DayFlag.outside]: "text-muted-foreground opacity-40",
-              [DayFlag.today]: "font-semibold text-primary",
-              [SelectionState.selected]: "text-primary-foreground",
-            }}
-          />
-          <AppointmentStatusLegend />
-        </section>
-
-        <DayAppointmentsPane
-          selectedDate={selectedDate}
-          onAppointmentClick={handleAppointmentClick}
-          onAppointmentAction={handleAppointmentAction}
-          onCreateAppointment={() => setIsCreateOpen(true)}
-        />
+      <div className="flex flex-wrap gap-2" data-print-hidden="true">
+        {CALENDAR_VIEW_OPTIONS.map((option) => (
+          <Button
+            key={option.value}
+            type="button"
+            variant={view === option.value ? 'default' : 'outline'}
+            onClick={() => handleViewChange(option.value)}
+          >
+            {t(option.labelKey)}
+          </Button>
+        ))}
       </div>
+
+      {view === 'month' && (
+        <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
+          <section className="min-w-0 overflow-hidden rounded-lg border bg-card p-3 shadow-sm sm:p-4 print:hidden" data-print-hidden="true">
+            <DayPicker
+              mode="single"
+              selected={selectedDate}
+              month={visibleMonth}
+              onSelect={handleSelectDate}
+              onMonthChange={handleMonthChange}
+              locale={skLocale}
+              weekStartsOn={1}
+              showOutsideDays
+              fixedWeeks
+              modifiers={{ booked: bookedDates }}
+              components={{
+                DayButton: (props) => (
+                  <CalendarDayButton
+                    {...props}
+                    bookedByDate={bookedByDate}
+                  />
+                ),
+              }}
+              classNames={{
+                [UI.Root]: "w-full max-w-full",
+                [UI.Months]: "relative w-full max-w-full",
+                [UI.Month]: "space-y-4",
+                [UI.MonthCaption]: "flex h-10 items-center justify-center",
+                [UI.CaptionLabel]: "text-base font-semibold text-gray-900",
+                [UI.Nav]: "absolute right-0 top-1 flex items-center gap-1 sm:right-1",
+                [UI.PreviousMonthButton]: "inline-flex h-8 w-8 items-center justify-center rounded-md border border-input bg-background text-sm hover:bg-accent disabled:opacity-40",
+                [UI.NextMonthButton]: "inline-flex h-8 w-8 items-center justify-center rounded-md border border-input bg-background text-sm hover:bg-accent disabled:opacity-40",
+                [UI.Chevron]: "h-4 w-4",
+                [UI.MonthGrid]: "w-full table-fixed border-collapse",
+                [UI.Weekdays]: "grid grid-cols-7",
+                [UI.Weekday]: "py-2 text-center text-xs font-medium text-muted-foreground",
+                [UI.Weeks]: "block",
+                [UI.Week]: "grid grid-cols-7",
+                [UI.Day]: "flex aspect-square min-w-0 items-center justify-center p-0",
+                [UI.DayButton]: "relative flex h-9 w-9 items-center justify-center rounded-md text-sm transition-colors hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 sm:h-10 sm:w-10",
+                [DayFlag.outside]: "text-muted-foreground opacity-40",
+                [DayFlag.today]: "font-semibold text-primary",
+                [SelectionState.selected]: "text-primary-foreground",
+              }}
+            />
+            <AppointmentStatusLegend />
+          </section>
+
+          <DayAppointmentsPane
+            selectedDate={selectedDate}
+            onAppointmentClick={handleAppointmentClick}
+            onAppointmentAction={handleAppointmentAction}
+            onCreateAppointment={() => setIsCreateOpen(true)}
+          />
+        </div>
+      )}
+
+      {view === 'week' && (
+        <WeekTimeGrid
+          weekStart={selectedWeekStart}
+          onSlotClick={handleSlotClick}
+          onAppointmentClick={handleAppointmentClick}
+        />
+      )}
+
+      {view === 'day' && (
+        <div className="space-y-6">
+          <DayTimeGrid
+            selectedDate={selectedDate}
+            onSlotClick={handleSlotClick}
+            onAppointmentClick={handleAppointmentClick}
+          />
+          <DayAppointmentsPane
+            selectedDate={selectedDate}
+            onAppointmentClick={handleAppointmentClick}
+            onAppointmentAction={handleAppointmentAction}
+            onCreateAppointment={() => setIsCreateOpen(true)}
+          />
+        </div>
+      )}
 
       <Button
         className="fixed bottom-6 right-6 z-30 rounded-full shadow-lg sm:hidden"
@@ -368,6 +446,11 @@ function AppointmentStatusLegend() {
 function getStatusDots(appointments: Appointment[]): Appointment['status'][] {
   const present = new Set(appointments.map((appointment) => appointment.status))
   return STATUS_DOT_PRIORITY.filter((status) => present.has(status)).slice(0, 3)
+}
+
+function parseViewParam(value: string | null): CalendarView {
+  if (value === 'week' || value === 'day' || value === 'month') return value
+  return 'month'
 }
 
 function parseDateParam(value: string | null): Date | null {
