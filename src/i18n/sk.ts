@@ -1,5 +1,8 @@
-﻿export const sk = {
+export const sk = {
   appName: "Salón pre psov",
+  appCrashedTitle: "Aplik\u00e1cia narazila na chybu.",
+  appCrashedDescription: "Sk\u00faste aplik\u00e1ciu re\u0161tartova\u0165. D\u00e1ta zost\u00e1vaj\u00fa ulo\u017een\u00e9 v zariaden\u00ed.",
+  restartApplication: "Re\u0161tartova\u0165 aplik\u00e1ciu",
   navCalendar: "Kalendár",
   navOwners: "Majitelia",
   navDogs: "Psíky",
@@ -104,6 +107,10 @@
   uploadPhoto: "Nahrať fotku",
   capturePhoto: "Odfotiť",
   processingPhoto: "Spracúvam fotku...",
+  processingGeneric: "Sprac\u00fava sa\u2026",
+  processingPhotoGlobal: "Sprac\u00fava sa fotka\u2026",
+  processingBackupGlobal: "Vytv\u00e1ram z\u00e1lohu\u2026",
+  processingRestoreGlobal: "Obnovujem z\u00e1lohu\u2026",
   photoUploadError: "Fotku sa nepodarilo spracovať",
   photoStorageQuotaError: "V zariadení nie je dosť miesta na uloženie fotky.",
   photoProcessingError: "Fotku sa nepodarilo spracovať.",

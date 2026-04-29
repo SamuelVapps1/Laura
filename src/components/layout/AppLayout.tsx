@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 
+import { AppBusyOverlay } from '@/components/AppBusyOverlay'
 import { BackupWarningBanner } from '@/components/backup/BackupWarningBanner'
 import { SearchProvider } from '@/search/SearchProvider'
 import { requestPersistentStorageOnce } from '@/lib/storagePersistence'
@@ -18,6 +19,7 @@ export function AppLayout() {
   return (
     <SearchProvider>
       <div className="min-h-screen bg-gray-50">
+        <AppBusyOverlay />
         <TopBar />
         <div className="flex">
           <Sidebar />

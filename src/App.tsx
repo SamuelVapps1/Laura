@@ -1,7 +1,9 @@
 import { createBrowserRouter, RouterProvider, Navigate } from "react-router-dom"
 import { AuthProvider } from "./auth/AuthProvider"
 import { RequireUnlock } from "./auth/RequireUnlock"
+import { ErrorBoundary } from "./components/ErrorBoundary"
 import { AppLayout } from "./components/layout/AppLayout"
+import { AppBusyProvider } from "./context/AppBusyContext"
 import { CalendarPage } from "./pages/CalendarPage"
 import { OwnersPage } from "./pages/OwnersPage"
 import { OwnerDetailPage } from "./pages/OwnerDetailPage"
@@ -15,7 +17,11 @@ import { LoginPage } from "./pages/LoginPage"
 const router = createBrowserRouter([
   {
     path: "/login",
-    element: <LoginPage />,
+    element: (
+      <ErrorBoundary>
+        <LoginPage />
+      </ErrorBoundary>
+    ),
   },
   {
     path: "/",
@@ -25,7 +31,9 @@ const router = createBrowserRouter([
     path: "/",
     element: (
       <RequireUnlock>
-        <AppLayout />
+        <ErrorBoundary>
+          <AppLayout />
+        </ErrorBoundary>
       </RequireUnlock>
     ),
     children: [
@@ -72,7 +80,9 @@ const router = createBrowserRouter([
 export function App() {
   return (
     <AuthProvider>
-      <RouterProvider router={router} />
+      <AppBusyProvider>
+        <RouterProvider router={router} />
+      </AppBusyProvider>
     </AuthProvider>
   )
 }
