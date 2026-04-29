@@ -317,6 +317,9 @@
   storagePersistentDenied: "Nepovolene",
   storagePersistentUnsupported: "Nepodporovane",
   storagePersistentRequested: "Aplikacia poziadala system o trvale ulozisko, aby sa lokalne data neodstranovali pri cisteni miesta.",
+  ownerTipBadge: "Tringelt",
+  ownerTotalTipAria: "Celkovy tringelt",
+  ownerTotalTipInline: "Celkovy tringelt",
 } as const
 
 export type TranslationKey = keyof typeof sk

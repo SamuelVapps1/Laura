@@ -1,10 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useLiveQuery } from 'dexie-react-hooks'
+
 import { Button } from '@/components/ui/button'
+import { OwnerTipBadge } from '@/components/owners/OwnerTipBadge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import type { Owner } from '@/db/db'
+import { getOwnerTipStatsMap, type OwnerTipStats } from '@/db/repositories/ownerStats'
 import { normalizeSearchText } from '@/db/search'
 import { t } from '@/i18n/sk'
+import { formatAppointmentPrice } from '@/lib/appointments'
 
 interface OwnerSearchSelectProps {
   owners: Owner[]
@@ -16,6 +21,15 @@ export function OwnerSearchSelect({ owners, value, onChange }: OwnerSearchSelect
   const selectedOwner = owners.find((owner) => owner.id === value)
   const [query, setQuery] = useState(selectedOwner?.fullName ?? '')
   const [isOpen, setIsOpen] = useState(false)
+  const ownerIds = useMemo(() => owners.map((owner) => owner.id), [owners])
+  const ownerIdsKey = useMemo(() => ownerIds.join('|'), [ownerIds])
+  const emptyStatsMap = useMemo(() => new Map<string, OwnerTipStats>(), [])
+
+  const tipStatsMap = useLiveQuery(
+    async () => getOwnerTipStatsMap(ownerIds),
+    [ownerIdsKey],
+    emptyStatsMap
+  )
 
   useEffect(() => {
     setQuery(selectedOwner?.fullName ?? '')
@@ -62,6 +76,8 @@ export function OwnerSearchSelect({ owners, value, onChange }: OwnerSearchSelect
     }
   }
 
+  const selectedOwnerTotalTips = selectedOwner ? (tipStatsMap.get(selectedOwner.id)?.totalTips ?? 0) : 0
+
   return (
     <div className="grid gap-2" onBlur={(event) => {
       if (!event.currentTarget.contains(event.relatedTarget)) {
@@ -78,6 +94,11 @@ export function OwnerSearchSelect({ owners, value, onChange }: OwnerSearchSelect
         placeholder={t('placeholderSearchOwner')}
         autoComplete="off"
       />
+      {selectedOwner && selectedOwnerTotalTips > 0 && (
+        <p className="text-xs text-muted-foreground">
+          {t('ownerTotalTipInline')}: {formatAppointmentPrice(selectedOwnerTotalTips)}
+        </p>
+      )}
       {isOpen && (
         <div className="max-h-40 overflow-y-auto rounded-md border border-input bg-background">
           {filteredOwners.length > 0 ? (
@@ -89,8 +110,15 @@ export function OwnerSearchSelect({ owners, value, onChange }: OwnerSearchSelect
                 className="w-full justify-start rounded-none"
                 onClick={() => handleSelect(owner)}
               >
-                <span className="truncate">{owner.fullName}</span>
-                {owner.phone && <span className="ml-2 text-xs text-muted-foreground">{owner.phone}</span>}
+                <span className="flex w-full items-center justify-between gap-2">
+                  <span className="min-w-0">
+                    <span className="block truncate">{owner.fullName}</span>
+                    {owner.phone && (
+                      <span className="block truncate text-xs text-muted-foreground">{owner.phone}</span>
+                    )}
+                  </span>
+                  <OwnerTipBadge totalTips={tipStatsMap.get(owner.id)?.totalTips ?? 0} compact />
+                </span>
               </Button>
             ))
           ) : (

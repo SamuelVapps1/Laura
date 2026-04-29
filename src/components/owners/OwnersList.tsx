@@ -1,10 +1,14 @@
 import { Link } from 'react-router-dom'
+import { useMemo } from 'react'
+import { useLiveQuery } from 'dexie-react-hooks'
 
 import { t } from '@/i18n/sk'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { OwnerTipBadge } from '@/components/owners/OwnerTipBadge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import type { Owner } from '@/db/db'
+import { getOwnerTipStatsMap, type OwnerTipStats } from '@/db/repositories/ownerStats'
 
 interface OwnersListProps {
   owners: Owner[]
@@ -13,6 +17,16 @@ interface OwnersListProps {
 }
 
 export function OwnersList({ owners, onEdit, onDelete }: OwnersListProps) {
+  const ownerIds = useMemo(() => owners.map((owner) => owner.id), [owners])
+  const ownerIdsKey = useMemo(() => ownerIds.join('|'), [ownerIds])
+  const emptyStatsMap = useMemo(() => new Map<string, OwnerTipStats>(), [])
+
+  const tipStatsMap = useLiveQuery(
+    async () => getOwnerTipStatsMap(ownerIds),
+    [ownerIdsKey],
+    emptyStatsMap
+  )
+
   if (owners.length === 0) {
     return (
       <Card>
@@ -39,7 +53,12 @@ export function OwnersList({ owners, onEdit, onDelete }: OwnersListProps) {
           <TableBody>
             {owners.map((owner) => (
               <TableRow key={owner.id}>
-                <TableCell className="font-medium">{owner.fullName}</TableCell>
+                <TableCell>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium">{owner.fullName}</span>
+                    <OwnerTipBadge totalTips={tipStatsMap.get(owner.id)?.totalTips ?? 0} compact />
+                  </div>
+                </TableCell>
                 <TableCell>{owner.phone || '-'}</TableCell>
                 <TableCell>{owner.email || '-'}</TableCell>
                 <TableCell className="text-right">{owner.notes || '-'}</TableCell>

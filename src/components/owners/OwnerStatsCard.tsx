@@ -1,7 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { db } from '@/db/db'
+import { getOwnerTipStats } from '@/db/repositories/ownerStats'
 import { t } from '@/i18n/sk'
 import { formatAppointmentPrice } from '@/lib/appointments'
 
@@ -11,23 +11,9 @@ type OwnerStatsCardProps = {
 
 export function OwnerStatsCard({ ownerId }: OwnerStatsCardProps) {
   const stats = useLiveQuery(
-    async () => {
-      const appointments = await db.appointments.where('ownerId').equals(ownerId).toArray()
-      let totalTips = 0
-      let appointmentsWithTips = 0
-
-      for (const appointment of appointments) {
-        const tip = appointment.tipAmount ?? 0
-        if (tip > 0) {
-          totalTips += tip
-          appointmentsWithTips += 1
-        }
-      }
-
-      return { totalTips, appointmentsWithTips }
-    },
+    async () => getOwnerTipStats(ownerId),
     [ownerId],
-    { totalTips: 0, appointmentsWithTips: 0 }
+    { ownerId, totalTips: 0, appointmentsWithTips: 0 }
   )
 
   return (
