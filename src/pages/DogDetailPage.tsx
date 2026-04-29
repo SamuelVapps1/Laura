@@ -5,10 +5,12 @@ import { useLiveQuery } from 'dexie-react-hooks'
 
 import { DisclosureSection } from '@/components/DisclosureSection'
 import { NotesEditor } from '@/components/NotesEditor'
+import { OwnerTipBadge } from '@/components/owners/OwnerTipBadge'
 import { TagPicker } from '@/components/TagPicker'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { db, type Appointment } from '@/db/db'
+import { getOwnerTipStats } from '@/db/repositories/ownerStats'
 import { t } from '@/i18n/sk'
 import {
   formatAppointmentDateTime,
@@ -31,6 +33,11 @@ export function DogDetailPage() {
     async () => dog ? (await db.owners.get(dog.ownerId)) ?? null : null,
     [dog],
     undefined
+  )
+  const ownerTipStats = useLiveQuery(
+    async () => (dog ? getOwnerTipStats(dog.ownerId) : null),
+    [dog?.ownerId],
+    null
   )
 
   const appointments = useLiveQuery(
@@ -102,9 +109,12 @@ export function DogDetailPage() {
           {owner && (
             <div className="grid gap-1 sm:grid-cols-[140px_1fr]">
               <span className="text-muted-foreground">{t('labelOwner')}</span>
-              <Link className="font-medium text-primary hover:underline" to={`/owners/${owner.id}`}>
-                {owner.fullName}
-              </Link>
+              <div className="flex flex-wrap items-center gap-2">
+                <Link className="font-medium text-primary hover:underline" to={`/owners/${owner.id}`}>
+                  {owner.fullName}
+                </Link>
+                <OwnerTipBadge compact totalTips={ownerTipStats?.totalTips ?? 0} />
+              </div>
             </div>
           )}
           {dog.breed && <DetailRow label={t('labelBreed')} value={dog.breed} />}

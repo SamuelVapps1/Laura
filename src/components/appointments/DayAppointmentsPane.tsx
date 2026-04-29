@@ -4,9 +4,11 @@ import { sk } from 'date-fns/locale'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { MoreHorizontal } from 'lucide-react'
 
+import { OwnerTipBadge } from '@/components/owners/OwnerTipBadge'
 import { Button } from '@/components/ui/button'
 import type { Appointment, Dog, Owner } from '@/db/db'
 import { db } from '@/db/db'
+import { getOwnerTipStatsMap } from '@/db/repositories/ownerStats'
 import { t } from '@/i18n/sk'
 import {
   formatAppointmentPrice,
@@ -27,6 +29,7 @@ type DayAppointment = {
   appointment: Appointment
   dog?: Dog
   owner?: Owner
+  ownerTotalTips: number
 }
 
 type MenuState = {
@@ -59,8 +62,11 @@ export function DayAppointmentsPane({
 
       const dogIds = Array.from(new Set(appointments.map((appointment) => appointment.dogId)))
       const ownerIds = Array.from(new Set(appointments.map((appointment) => appointment.ownerId)))
-      const dogs = await db.dogs.bulkGet(dogIds)
-      const owners = await db.owners.bulkGet(ownerIds)
+      const [dogs, owners, ownerTipStatsMap] = await Promise.all([
+        db.dogs.bulkGet(dogIds),
+        db.owners.bulkGet(ownerIds),
+        getOwnerTipStatsMap(ownerIds),
+      ])
       const dogsById = new Map(dogs.filter(isDefined).map((dog) => [dog.id, dog]))
       const ownersById = new Map(owners.filter(isDefined).map((owner) => [owner.id, owner]))
 
@@ -68,6 +74,7 @@ export function DayAppointmentsPane({
         appointment,
         dog: dogsById.get(appointment.dogId),
         owner: ownersById.get(appointment.ownerId),
+        ownerTotalTips: ownerTipStatsMap.get(appointment.ownerId)?.totalTips ?? 0,
       }))
     },
     [dayStartIso, dayEndIso],
@@ -136,7 +143,7 @@ export function DayAppointmentsPane({
 
       {items.length > 0 ? (
         <div className="space-y-3">
-          {items.map(({ appointment, dog, owner }) => (
+          {items.map(({ appointment, dog, owner, ownerTotalTips }) => (
             <div key={appointment.id} className="relative rounded-md border bg-background shadow-sm">
               <button
                 type="button"
@@ -155,9 +162,10 @@ export function DayAppointmentsPane({
                     <p className="font-medium text-gray-900">
                       {formatAppointmentTime(appointment)} - {dog?.name ?? t('appointmentUnknownDog')}
                     </p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {owner?.fullName ?? t('appointmentUnknownOwner')}
-                    </p>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                      <span>{owner?.fullName ?? t('appointmentUnknownOwner')}</span>
+                      <OwnerTipBadge compact totalTips={ownerTotalTips} />
+                    </div>
                   </div>
                   <span
                     className={cn(

@@ -9,6 +9,7 @@ import { TagPicker } from '@/components/TagPicker'
 import { AppointmentFormDialog } from '@/components/appointments/AppointmentFormDialog'
 import { DeleteAppointmentDialog } from '@/components/appointments/DeleteAppointmentDialog'
 import { DogHistoryPreview } from '@/components/dogs/DogHistoryPreview'
+import { OwnerTipBadge } from '@/components/owners/OwnerTipBadge'
 import { AppointmentPhotoSection } from '@/components/photos/AppointmentPhotoSection'
 import { Button } from '@/components/ui/button'
 import {
@@ -21,6 +22,7 @@ import {
 } from '@/components/ui/sheet'
 import type { Appointment, Dog, Owner } from '@/db/db'
 import { db } from '@/db/db'
+import { getOwnerTipStats } from '@/db/repositories/ownerStats'
 import { t } from '@/i18n/sk'
 import {
   formatAppointmentDateTime,
@@ -74,6 +76,14 @@ export function AppointmentDetailPanel({ appointmentId, onClose }: AppointmentDe
 
   const appointment = detail.appointment
   const selectedDate = appointment ? new Date(appointment.startsAt) : new Date()
+  const ownerTipStats = useLiveQuery(
+    async () => {
+      if (!appointment) return null
+      return getOwnerTipStats(appointment.ownerId)
+    },
+    [appointment?.ownerId],
+    null
+  )
 
   return (
     <Sheet
@@ -117,8 +127,9 @@ export function AppointmentDetailPanel({ appointmentId, onClose }: AppointmentDe
                   <SheetTitle className="truncate">
                     {detail.dog?.name ?? t('appointmentUnknownDog')}
                   </SheetTitle>
-                  <SheetDescription>
-                    {detail.owner?.fullName ?? t('appointmentUnknownOwner')}
+                  <SheetDescription className="mt-1 flex flex-wrap items-center gap-2">
+                    <span>{detail.owner?.fullName ?? t('appointmentUnknownOwner')}</span>
+                    <OwnerTipBadge compact totalTips={ownerTipStats?.totalTips ?? 0} />
                   </SheetDescription>
                 </div>
               </div>
