@@ -7,6 +7,7 @@ import { NotesEditor } from '@/components/NotesEditor'
 import { OwnerFormDialog } from '@/components/owners/OwnerFormDialog'
 import { OwnerDogsSection } from '@/components/owners/OwnerDogsSection'
 import { OwnerStatsCard } from '@/components/owners/OwnerStatsCard'
+import { EntityGallerySection } from '@/components/photos/EntityGallerySection'
 import { TagPicker } from '@/components/TagPicker'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -76,6 +77,12 @@ export function OwnerDetailPage() {
           {owner.notes && <DetailRow label={t('legacyNotes')} value={owner.notes} />}
         </CardContent>
       </Card>
+
+      <EntityGallerySection
+        entityType="owner"
+        entityId={owner.id}
+        title={t('ownerGalleryPhotos')}
+      />
 
       <OwnerDogsSection ownerId={owner.id} />
       <OwnerStatsCard ownerId={owner.id} />

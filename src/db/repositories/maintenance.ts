@@ -1,7 +1,10 @@
 import {
   db,
+  type EntityGalleryAsset,
+  type EntityGalleryItem,
   type EntityId,
   type EntityNote,
+  type GalleryEntityType,
   type NoteScope,
   type PhotoAsset,
   type PhotoSession,
@@ -15,6 +18,8 @@ export type OrphanCleanupCounts = {
   legacyDogTags: number
   photoSessions: number
   photos: number
+  entityGalleryItems: number
+  entityGalleryAssets: number
 }
 
 export async function cleanupDanglingReferences(): Promise<OrphanCleanupCounts> {
@@ -31,6 +36,8 @@ export async function cleanupDanglingReferences(): Promise<OrphanCleanupCounts> 
       db.tagApplications,
       db.photoSessions,
       db.photos,
+      db.entityGalleryItems,
+      db.entityGalleryAssets,
     ],
     async () => {
       const [
@@ -44,6 +51,8 @@ export async function cleanupDanglingReferences(): Promise<OrphanCleanupCounts> 
         tagApplications,
         photoSessions,
         photos,
+        entityGalleryItems,
+        entityGalleryAssets,
       ] = await Promise.all([
         db.owners.toArray(),
         db.dogs.toArray(),
@@ -55,6 +64,8 @@ export async function cleanupDanglingReferences(): Promise<OrphanCleanupCounts> 
         db.tagApplications.toArray(),
         db.photoSessions.toArray(),
         db.photos.toArray(),
+        db.entityGalleryItems.toArray(),
+        db.entityGalleryAssets.toArray(),
       ])
 
       const counts: OrphanCleanupCounts = {
@@ -63,6 +74,8 @@ export async function cleanupDanglingReferences(): Promise<OrphanCleanupCounts> 
         legacyDogTags: 0,
         photoSessions: 0,
         photos: 0,
+        entityGalleryItems: 0,
+        entityGalleryAssets: 0,
       }
 
       const ownerIds = new Set(owners.map((owner) => owner.id))
@@ -73,6 +86,8 @@ export async function cleanupDanglingReferences(): Promise<OrphanCleanupCounts> 
       const appointmentsById = new Map(appointments.map((appointment) => [appointment.id, appointment]))
       const photoSessionsById = new Map(photoSessions.map((session) => [session.id, session]))
       const invalidPhotoSessionIds = new Set<EntityId>()
+      const validGalleryItemIds = new Set(entityGalleryItems.map((item) => item.id))
+      const invalidGalleryItemIds = new Set<EntityId>()
 
       for (const note of notes) {
         if (!noteTargetExists(note, ownerIds, dogIds, appointmentIds)) {
@@ -121,9 +136,47 @@ export async function cleanupDanglingReferences(): Promise<OrphanCleanupCounts> 
         }
       }
 
+      for (const item of entityGalleryItems) {
+        if (!galleryItemTargetIsValid(item, ownerIds, dogIds)) {
+          invalidGalleryItemIds.add(item.id)
+          validGalleryItemIds.delete(item.id)
+          await db.entityGalleryItems.delete(item.id)
+          counts.entityGalleryItems += 1
+        }
+      }
+
+      for (const asset of entityGalleryAssets) {
+        if (!galleryAssetTargetIsValid(asset, validGalleryItemIds, invalidGalleryItemIds)) {
+          await db.entityGalleryAssets.delete(asset.id)
+          counts.entityGalleryAssets += 1
+        }
+      }
+
       return counts
     }
   )
+}
+
+function galleryItemTargetIsValid(
+  item: EntityGalleryItem,
+  ownerIds: Set<EntityId>,
+  dogIds: Set<EntityId>
+): boolean {
+  if (!isValidGalleryEntityType(item.entityType)) return false
+  if (item.entityType === 'owner') return ownerIds.has(item.entityId)
+  return dogIds.has(item.entityId)
+}
+
+function galleryAssetTargetIsValid(
+  asset: EntityGalleryAsset,
+  validGalleryItemIds: Set<EntityId>,
+  invalidGalleryItemIds: Set<EntityId>
+): boolean {
+  return !invalidGalleryItemIds.has(asset.itemId) && validGalleryItemIds.has(asset.itemId)
+}
+
+function isValidGalleryEntityType(entityType: string): entityType is GalleryEntityType {
+  return entityType === 'owner' || entityType === 'dog'
 }
 
 function noteTargetExists(

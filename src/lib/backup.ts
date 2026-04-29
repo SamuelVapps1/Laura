@@ -12,7 +12,7 @@ import {
   validateBackupPassword,
   type EncryptedBackupManifest,
 } from '@/lib/backupCrypto'
-import { db, type AppSetting, type Appointment, type Dog, type DogTag, type EntityId, type EntityNote, type ISODateTime, type Owner, type PhotoAsset, type PhotoKind, type PhotoSession, type PhotoVariant, type Tag, type TagApplication, type TagDefinition, type TagScope } from '@/db/db'
+import { db, type AppSetting, type Appointment, type Dog, type DogTag, type EntityGalleryAsset, type EntityGalleryItem, type EntityId, type EntityNote, type GalleryEntityType, type GalleryPhotoVariant, type ISODateTime, type Owner, type PhotoAsset, type PhotoKind, type PhotoSession, type PhotoVariant, type Tag, type TagApplication, type TagDefinition, type TagScope } from '@/db/db'
 import { cleanupDanglingReferences } from '@/db/repositories/maintenance'
 import { LAST_BACKUP_AT_KEY, setLastBackupAt } from '@/db/repositories/settings'
 
@@ -50,6 +50,8 @@ export type BackupCounts = {
   tagApplications: number
   photoSessions: number
   photos: number
+  entityGalleryItems: number
+  entityGalleryAssets: number
 }
 
 export type BackupManifest = {
@@ -76,6 +78,18 @@ export type PhotoBackupRecord = {
   filePath: string
 }
 
+export type EntityGalleryAssetBackupRecord = {
+  id: EntityId
+  itemId: EntityId
+  variant: GalleryPhotoVariant
+  mimeType: 'image/webp'
+  width: number | null
+  height: number | null
+  sizeBytes: number
+  createdAt: ISODateTime
+  filePath: string
+}
+
 export type BackupData = {
   owners: Owner[]
   dogs: Dog[]
@@ -88,6 +102,8 @@ export type BackupData = {
   tagApplications: TagApplication[]
   photoSessions: PhotoSession[]
   photos: PhotoBackupRecord[]
+  entityGalleryItems: EntityGalleryItem[]
+  entityGalleryAssets: EntityGalleryAssetBackupRecord[]
 }
 
 export type ParsedBackupPreview = {
@@ -123,10 +139,14 @@ export class BackupError extends Error {
 
 const APP_NAME = 'Salón pre psov'
 const PHOTO_DIR = 'photos'
+const ENTITY_GALLERY_DIR = 'entity-gallery'
 const PHOTO_FILE_PATTERN = /^photos\/[^/\\]+\.webp$/
+const ENTITY_GALLERY_FILE_PATTERN = /^entity-gallery\/[^/\\]+\.webp$/
 const ENCRYPTED_OUTER_ALLOWED_FILES = new Set(['manifest.json', 'payload.bin'])
 const PHOTO_KINDS = ['before', 'after'] as const satisfies readonly PhotoKind[]
 const PHOTO_VARIANTS = ['full', 'thumb'] as const satisfies readonly PhotoVariant[]
+const GALLERY_ENTITY_TYPES = ['owner', 'dog'] as const satisfies readonly GalleryEntityType[]
+const GALLERY_PHOTO_VARIANTS = ['full', 'thumb'] as const satisfies readonly GalleryPhotoVariant[]
 const NOTE_SCOPES = ['appointment', 'owner', 'dog'] as const
 const TAG_SCOPES = ['appointment', 'owner', 'dog'] as const satisfies readonly TagScope[]
 const APPOINTMENT_STATUSES = ['scheduled', 'done', 'cancelled', 'no_show'] as const satisfies readonly Appointment['status'][]
@@ -142,9 +162,15 @@ const BACKUP_DATA_KEYS = [
   'tagApplications',
   'photoSessions',
   'photos',
+  'entityGalleryItems',
+  'entityGalleryAssets',
 ] as const satisfies readonly (keyof BackupData)[]
 
 const BACKUP_COUNT_KEYS = BACKUP_DATA_KEYS satisfies readonly (keyof BackupCounts)[]
+const OPTIONAL_BACKUP_COUNT_KEYS = new Set<keyof BackupCounts>([
+  'entityGalleryItems',
+  'entityGalleryAssets',
+])
 const ALL_APP_TABLES = [
   db.owners,
   db.dogs,
@@ -157,10 +183,13 @@ const ALL_APP_TABLES = [
   db.tagApplications,
   db.photoSessions,
   db.photos,
+  db.entityGalleryItems,
+  db.entityGalleryAssets,
 ] as const
 
-type BackupSnapshot = Omit<BackupData, 'photos'> & {
+type BackupSnapshot = Omit<BackupData, 'photos' | 'entityGalleryAssets'> & {
   photos: PhotoAsset[]
+  entityGalleryAssets: EntityGalleryAsset[]
 }
 
 export type ExportBackupOptions = {
@@ -261,13 +290,16 @@ async function buildPlainBackupZip(onProgress?: (progress: BackupProgress) => vo
     tagApplications: snapshot.tagApplications,
     photoSessions: snapshot.photoSessions,
     photos: [],
+    entityGalleryItems: snapshot.entityGalleryItems,
+    entityGalleryAssets: [],
   }
   const zipEntries: Zippable = {}
+  const totalBinaryAssets = snapshot.photos.length + snapshot.entityGalleryAssets.length
 
   reportProgress(onProgress, {
     stage: 'preparing',
     current: 0,
-    total: snapshot.photos.length,
+    total: totalBinaryAssets,
   })
 
   for (let index = 0; index < snapshot.photos.length; index += 1) {
@@ -282,7 +314,25 @@ async function buildPlainBackupZip(onProgress?: (progress: BackupProgress) => vo
       reportProgress(onProgress, {
         stage: 'preparing',
         current: index + 1,
-        total: snapshot.photos.length,
+        total: totalBinaryAssets,
+      })
+    }
+  }
+
+  for (let index = 0; index < snapshot.entityGalleryAssets.length; index += 1) {
+    const asset = snapshot.entityGalleryAssets[index]
+    const record = toEntityGalleryAssetBackupRecord(asset)
+    const bytes = new Uint8Array(await asset.blob.arrayBuffer())
+    const current = snapshot.photos.length + index + 1
+
+    data.entityGalleryAssets.push(record)
+    zipEntries[record.filePath] = [bytes, { level: 0 }]
+
+    if (shouldReportPhotoProgress(index, snapshot.entityGalleryAssets.length)) {
+      reportProgress(onProgress, {
+        stage: 'preparing',
+        current,
+        total: totalBinaryAssets,
       })
     }
   }
@@ -467,10 +517,12 @@ export async function restoreBackup(
     }
 
     validateBackupIntegrity(data, parsed.photoFiles)
+    const totalBinaryAssets = data.photos.length + data.entityGalleryAssets.length
+    const restoreSteps = 14
     reportProgress(onProgress, {
       stage: 'restoring',
       current: 0,
-      total: data.photos.length + 12,
+      total: totalBinaryAssets + restoreSteps,
     })
 
     const photoAssets = data.photos.map((photo, index) => {
@@ -483,48 +535,65 @@ export async function restoreBackup(
         reportProgress(onProgress, {
           stage: 'restoring',
           current: index + 1,
-          total: data.photos.length + 12,
+          total: totalBinaryAssets + restoreSteps,
         })
       }
 
       return toPhotoAsset(photo, bytes)
     })
 
+    const entityGalleryAssets = data.entityGalleryAssets.map((asset, index) => {
+      const bytes = parsed.photoFiles.get(asset.filePath)
+      if (!bytes) {
+        throw new BackupError('invalid_file')
+      }
+
+      if (shouldReportPhotoProgress(index, data.entityGalleryAssets.length)) {
+        reportProgress(onProgress, {
+          stage: 'restoring',
+          current: data.photos.length + index + 1,
+          total: totalBinaryAssets + restoreSteps,
+        })
+      }
+
+      return toEntityGalleryAsset(asset, bytes)
+    })
+
     const now = new Date().toISOString()
-    let current = data.photos.length
+    let current = totalBinaryAssets
 
     await db.transaction('rw', ALL_APP_TABLES, async () => {
       await clearAllStores()
       current += 1
-      reportProgress(onProgress, { stage: 'restoring', current, total: data.photos.length + 12 })
+      reportProgress(onProgress, { stage: 'restoring', current, total: totalBinaryAssets + restoreSteps })
 
       if (data.owners.length > 0) await db.owners.bulkAdd(data.owners.map(normalizeBackupOwner))
       current += 1
-      reportProgress(onProgress, { stage: 'restoring', current, total: data.photos.length + 12 })
+      reportProgress(onProgress, { stage: 'restoring', current, total: totalBinaryAssets + restoreSteps })
 
       if (data.dogs.length > 0) await db.dogs.bulkAdd(data.dogs)
       current += 1
-      reportProgress(onProgress, { stage: 'restoring', current, total: data.photos.length + 12 })
+      reportProgress(onProgress, { stage: 'restoring', current, total: totalBinaryAssets + restoreSteps })
 
       if (data.appointments.length > 0) await db.appointments.bulkAdd(data.appointments)
       current += 1
-      reportProgress(onProgress, { stage: 'restoring', current, total: data.photos.length + 12 })
+      reportProgress(onProgress, { stage: 'restoring', current, total: totalBinaryAssets + restoreSteps })
 
       if (data.tags.length > 0) await db.tags.bulkAdd(data.tags)
       current += 1
-      reportProgress(onProgress, { stage: 'restoring', current, total: data.photos.length + 12 })
+      reportProgress(onProgress, { stage: 'restoring', current, total: totalBinaryAssets + restoreSteps })
 
       if (data.dogTags.length > 0) await db.dogTags.bulkAdd(data.dogTags)
       current += 1
-      reportProgress(onProgress, { stage: 'restoring', current, total: data.photos.length + 12 })
+      reportProgress(onProgress, { stage: 'restoring', current, total: totalBinaryAssets + restoreSteps })
 
       if (data.appSettings.length > 0) await db.appSettings.bulkAdd(data.appSettings)
       current += 1
-      reportProgress(onProgress, { stage: 'restoring', current, total: data.photos.length + 12 })
+      reportProgress(onProgress, { stage: 'restoring', current, total: totalBinaryAssets + restoreSteps })
 
       if (data.notes.length > 0) await db.notes.bulkAdd(data.notes)
       current += 1
-      reportProgress(onProgress, { stage: 'restoring', current, total: data.photos.length + 12 })
+      reportProgress(onProgress, { stage: 'restoring', current, total: totalBinaryAssets + restoreSteps })
 
       if (data.tagDefinitions.length > 0) {
         await db.tagDefinitions.bulkAdd(
@@ -532,17 +601,28 @@ export async function restoreBackup(
         )
       }
       current += 1
-      reportProgress(onProgress, { stage: 'restoring', current, total: data.photos.length + 12 })
+      reportProgress(onProgress, { stage: 'restoring', current, total: totalBinaryAssets + restoreSteps })
 
       if (data.tagApplications.length > 0) await db.tagApplications.bulkAdd(data.tagApplications)
       current += 1
-      reportProgress(onProgress, { stage: 'restoring', current, total: data.photos.length + 12 })
+      reportProgress(onProgress, { stage: 'restoring', current, total: totalBinaryAssets + restoreSteps })
 
       if (data.photoSessions.length > 0) await db.photoSessions.bulkAdd(data.photoSessions)
       current += 1
-      reportProgress(onProgress, { stage: 'restoring', current, total: data.photos.length + 12 })
+      reportProgress(onProgress, { stage: 'restoring', current, total: totalBinaryAssets + restoreSteps })
 
       if (photoAssets.length > 0) await db.photos.bulkAdd(photoAssets)
+      current += 1
+      reportProgress(onProgress, { stage: 'restoring', current, total: totalBinaryAssets + restoreSteps })
+
+      if (data.entityGalleryItems.length > 0) await db.entityGalleryItems.bulkAdd(data.entityGalleryItems)
+      current += 1
+      reportProgress(onProgress, { stage: 'restoring', current, total: totalBinaryAssets + restoreSteps })
+
+      if (entityGalleryAssets.length > 0) await db.entityGalleryAssets.bulkAdd(entityGalleryAssets)
+      current += 1
+      reportProgress(onProgress, { stage: 'restoring', current, total: totalBinaryAssets + restoreSteps })
+
       await db.appSettings.put({
         key: LAST_BACKUP_AT_KEY,
         value: now,
@@ -579,6 +659,8 @@ function readBackupSnapshot(): Promise<BackupSnapshot> {
     tagApplications: await db.tagApplications.toArray(),
     photoSessions: await db.photoSessions.toArray(),
     photos: await db.photos.toArray(),
+    entityGalleryItems: await db.entityGalleryItems.toArray(),
+    entityGalleryAssets: await db.entityGalleryAssets.toArray(),
   }))
 }
 
@@ -594,6 +676,8 @@ async function clearAllStores(): Promise<void> {
   await db.tagApplications.clear()
   await db.photoSessions.clear()
   await db.photos.clear()
+  await db.entityGalleryItems.clear()
+  await db.entityGalleryAssets.clear()
 }
 
 function toPhotoBackupRecord(photo: PhotoAsset): PhotoBackupRecord {
@@ -632,6 +716,37 @@ function toPhotoAsset(photo: PhotoBackupRecord, bytes: Uint8Array): PhotoAsset {
   }
 }
 
+function toEntityGalleryAssetBackupRecord(asset: EntityGalleryAsset): EntityGalleryAssetBackupRecord {
+  return {
+    id: asset.id,
+    itemId: asset.itemId,
+    variant: asset.variant,
+    mimeType: asset.mimeType,
+    width: asset.width,
+    height: asset.height,
+    sizeBytes: asset.sizeBytes,
+    createdAt: asset.createdAt,
+    filePath: getEntityGalleryFilePath(asset.id),
+  }
+}
+
+function toEntityGalleryAsset(
+  asset: EntityGalleryAssetBackupRecord,
+  bytes: Uint8Array
+): EntityGalleryAsset {
+  return {
+    id: asset.id,
+    itemId: asset.itemId,
+    variant: asset.variant,
+    blob: new Blob([toArrayBuffer(bytes)], { type: 'image/webp' }),
+    mimeType: 'image/webp',
+    width: asset.width,
+    height: asset.height,
+    sizeBytes: asset.sizeBytes,
+    createdAt: asset.createdAt,
+  }
+}
+
 function validateManifestPayload(value: unknown): BackupManifest {
   const record = requireRecord(value)
 
@@ -650,6 +765,11 @@ function validateManifestPayload(value: unknown): BackupManifest {
   const countsRecord = requireRecord(record.counts)
   const counts = BACKUP_COUNT_KEYS.reduce<BackupCounts>((result, key) => {
     const count = countsRecord[key]
+    if (count === undefined && OPTIONAL_BACKUP_COUNT_KEYS.has(key)) {
+      result[key] = 0
+      return result
+    }
+
     if (!isValidCount(count)) {
       throw new BackupError('invalid_file')
     }
@@ -682,6 +802,8 @@ function validateBackupDataPayload(value: unknown): BackupData {
     tagApplications: validateArray(record.tagApplications, validateTagApplication),
     photoSessions: validateArray(record.photoSessions, validatePhotoSession),
     photos: validateArray(record.photos, validatePhotoBackupRecord),
+    entityGalleryItems: validateArray(record.entityGalleryItems ?? [], validateEntityGalleryItem),
+    entityGalleryAssets: validateArray(record.entityGalleryAssets ?? [], validateEntityGalleryAssetBackupRecord),
   }
 }
 
@@ -698,6 +820,9 @@ function validateBackupIntegrity(data: BackupData, photoFiles: Map<string, Uint8
   ensureUniqueValues(data.photoSessions.map((session) => session.id))
   ensureUniqueValues(data.photos.map((photo) => photo.id))
   ensureUniqueValues(data.dogTags.map((dogTag) => `${dogTag.dogId}\u0000${dogTag.tagId}`))
+  ensureUniqueValues(data.entityGalleryItems.map((item) => item.id))
+  ensureUniqueValues(data.entityGalleryAssets.map((asset) => asset.id))
+  ensureUniqueValues(data.entityGalleryAssets.map((asset) => `${asset.itemId}\u0000${asset.variant}`))
 
   const ownerIds = new Set(data.owners.map((owner) => owner.id))
   const legacyTagIds = new Set(data.tags.map((tag) => tag.id))
@@ -705,6 +830,7 @@ function validateBackupIntegrity(data: BackupData, photoFiles: Map<string, Uint8
   const dogsById = new Map(data.dogs.map((dog) => [dog.id, dog]))
   const appointmentsById = new Map(data.appointments.map((appointment) => [appointment.id, appointment]))
   const photoSessionsById = new Map(data.photoSessions.map((session) => [session.id, session]))
+  const entityGalleryItemIds = new Set(data.entityGalleryItems.map((item) => item.id))
   const dogIds = new Set(data.dogs.map((dog) => dog.id))
   const appointmentIds = new Set(data.appointments.map((appointment) => appointment.id))
 
@@ -783,6 +909,31 @@ function validateBackupIntegrity(data: BackupData, photoFiles: Map<string, Uint8
       photo.appointmentId !== session.appointmentId ||
       photo.dogId !== session.dogId
     ) {
+      throw new BackupError('invalid_file')
+    }
+
+    if (!bytes || bytes.byteLength === 0) {
+      throw new BackupError('invalid_file')
+    }
+  })
+
+  data.entityGalleryItems.forEach((item) => {
+    switch (item.entityType) {
+      case 'owner':
+        if (!ownerIds.has(item.entityId)) throw new BackupError('invalid_file')
+        return
+      case 'dog':
+        if (!dogIds.has(item.entityId)) throw new BackupError('invalid_file')
+        return
+      default:
+        throw new BackupError('invalid_file')
+    }
+  })
+
+  data.entityGalleryAssets.forEach((asset) => {
+    const bytes = photoFiles.get(asset.filePath)
+
+    if (!entityGalleryItemIds.has(asset.itemId)) {
       throw new BackupError('invalid_file')
     }
 
@@ -934,6 +1085,59 @@ function validatePhotoBackupRecord(value: unknown): asserts value is PhotoBackup
   }
 }
 
+function validateEntityGalleryItem(value: unknown): asserts value is EntityGalleryItem {
+  const record = requireRecord(value)
+  requireString(record.id)
+  requireString(record.entityId)
+  requireString(record.createdAt)
+  requireString(record.updatedAt)
+
+  if (!GALLERY_ENTITY_TYPES.includes(record.entityType as GalleryEntityType)) {
+    throw new BackupError('invalid_file')
+  }
+
+  if (record.caption === undefined) {
+    record.caption = null
+  } else if (record.caption !== null && typeof record.caption !== 'string') {
+    throw new BackupError('invalid_file')
+  }
+}
+
+function validateEntityGalleryAssetBackupRecord(
+  value: unknown
+): asserts value is EntityGalleryAssetBackupRecord {
+  const record = requireRecord(value)
+  const id = requireString(record.id)
+  const filePath = requireString(record.filePath)
+
+  requireString(record.itemId)
+  requireString(record.createdAt)
+
+  if ('blob' in record) {
+    throw new BackupError('invalid_file')
+  }
+
+  if (filePath !== getEntityGalleryFilePath(id) || !ENTITY_GALLERY_FILE_PATTERN.test(filePath)) {
+    throw new BackupError('invalid_file')
+  }
+
+  if (!GALLERY_PHOTO_VARIANTS.includes(record.variant as GalleryPhotoVariant)) {
+    throw new BackupError('invalid_file')
+  }
+
+  if (record.mimeType !== 'image/webp') {
+    throw new BackupError('invalid_file')
+  }
+
+  if (!isNullableFiniteNumber(record.width) || !isNullableFiniteNumber(record.height)) {
+    throw new BackupError('invalid_file')
+  }
+
+  if (typeof record.sizeBytes !== 'number' || !Number.isFinite(record.sizeBytes) || record.sizeBytes < 0) {
+    throw new BackupError('invalid_file')
+  }
+}
+
 function validateArray<T>(value: unknown, validate: (row: unknown) => asserts row is T): T[] {
   if (!Array.isArray(value)) {
     throw new BackupError('invalid_file')
@@ -947,7 +1151,7 @@ function collectPhotoFiles(unzipped: Record<string, Uint8Array>): Map<string, Ui
   const photoFiles = new Map<string, Uint8Array>()
 
   Object.entries(unzipped).forEach(([path, bytes]) => {
-    if (path.startsWith(`${PHOTO_DIR}/`)) {
+    if (path.startsWith(`${PHOTO_DIR}/`) || path.startsWith(`${ENTITY_GALLERY_DIR}/`)) {
       photoFiles.set(path, bytes)
     }
   })
@@ -976,6 +1180,8 @@ function createCounts(data: BackupData): BackupCounts {
     tagApplications: data.tagApplications.length,
     photoSessions: data.photoSessions.length,
     photos: data.photos.length,
+    entityGalleryItems: data.entityGalleryItems.length,
+    entityGalleryAssets: data.entityGalleryAssets.length,
   }
 }
 
@@ -992,6 +1198,8 @@ function createEmptyCounts(): BackupCounts {
     tagApplications: 0,
     photoSessions: 0,
     photos: 0,
+    entityGalleryItems: 0,
+    entityGalleryAssets: 0,
   }
 }
 
@@ -1047,6 +1255,10 @@ function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
 
 function getPhotoFilePath(photoId: string): string {
   return `${PHOTO_DIR}/${photoId}.webp`
+}
+
+function getEntityGalleryFilePath(assetId: string): string {
+  return `${ENTITY_GALLERY_DIR}/${assetId}.webp`
 }
 
 function padDatePart(value: number): string {

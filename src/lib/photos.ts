@@ -33,7 +33,42 @@ type ImageDimensions = {
   height: number | null
 }
 
+export type ProcessedPhotoBlob = {
+  blob: Blob
+  width: number | null
+  height: number | null
+  sizeBytes: number
+}
+
+export type ProcessedPhotoPair = {
+  full: ProcessedPhotoBlob
+  thumb: ProcessedPhotoBlob
+}
+
 export async function processAndStorePhoto(file: File, options: PhotoProcessingOptions): Promise<void> {
+  try {
+    const processed = await processGalleryImageFile(file)
+
+    await replaceSessionPhoto({
+      sessionId: options.sessionId,
+      kind: options.kind,
+      full: processed.full,
+      thumb: processed.thumb,
+    })
+  } catch (error) {
+    if (error instanceof Error && isDatabaseErrorMessage(error.message)) {
+      throw error
+    }
+
+    if (isStorageQuotaError(error)) {
+      throw new Error(DB_ERROR.PHOTO_STORAGE_QUOTA_EXCEEDED)
+    }
+
+    throw new Error(DB_ERROR.PHOTO_PROCESSING_FAILED)
+  }
+}
+
+export async function processGalleryImageFile(file: File): Promise<ProcessedPhotoPair> {
   try {
     const fullBlob = await imageCompression(file, FULL_OPTIONS)
     const thumbBlob = await imageCompression(fullBlob, THUMB_OPTIONS)
@@ -42,9 +77,7 @@ export async function processAndStorePhoto(file: File, options: PhotoProcessingO
       getImageDimensions(thumbBlob),
     ])
 
-    await replaceSessionPhoto({
-      sessionId: options.sessionId,
-      kind: options.kind,
+    return {
       full: {
         blob: fullBlob,
         width: fullDimensions.width,
@@ -57,12 +90,8 @@ export async function processAndStorePhoto(file: File, options: PhotoProcessingO
         height: thumbDimensions.height,
         sizeBytes: thumbBlob.size,
       },
-    })
-  } catch (error) {
-    if (error instanceof Error && isDatabaseErrorMessage(error.message)) {
-      throw error
     }
-
+  } catch (error) {
     if (isStorageQuotaError(error)) {
       throw new Error(DB_ERROR.PHOTO_STORAGE_QUOTA_EXCEEDED)
     }

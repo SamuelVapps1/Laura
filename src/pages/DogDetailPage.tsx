@@ -6,6 +6,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { DisclosureSection } from '@/components/DisclosureSection'
 import { DogFormDialog } from '@/components/dogs/DogFormDialog'
 import { OwnerTipBadge } from '@/components/owners/OwnerTipBadge'
+import { EntityGallerySection } from '@/components/photos/EntityGallerySection'
 import { TagPicker } from '@/components/TagPicker'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -97,7 +98,7 @@ export function DogDetailPage() {
           <Button asChild variant="outline">
             <Link to={`/dogs/${dog.id}/gallery`}>
               <Images className="h-4 w-4" />
-              {t('openDogGallery')}
+              {t('openDogAppointmentGallery')}
             </Link>
           </Button>
           <Button asChild variant="outline">
@@ -131,6 +132,12 @@ export function DogDetailPage() {
       </Card>
 
       <DogNotesCard dog={dog} />
+
+      <EntityGallerySection
+        entityType="dog"
+        entityId={dog.id}
+        title={t('dogGalleryPhotos')}
+      />
 
       <Card id="history" className="scroll-mt-6">
         <CardHeader>

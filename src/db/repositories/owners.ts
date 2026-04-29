@@ -61,23 +61,50 @@ export async function updateOwner(id: string, patch: UpdateOwnerInput): Promise<
 }
 
 export async function deleteOwner(id: string): Promise<void> {
-  await db.transaction('rw', db.owners, db.dogs, db.notes, db.tagApplications, async () => {
-    const dogCount = await db.dogs.where('ownerId').equals(id).count()
-    if (dogCount > 0) {
-      throw new Error(DB_ERROR.OWNER_HAS_DOGS)
-    }
+  await db.transaction(
+    'rw',
+    [
+      db.owners,
+      db.dogs,
+      db.notes,
+      db.tagApplications,
+      db.entityGalleryItems,
+      db.entityGalleryAssets,
+    ],
+    async () => {
+      const dogCount = await db.dogs.where('ownerId').equals(id).count()
+      if (dogCount > 0) {
+        throw new Error(DB_ERROR.OWNER_HAS_DOGS)
+      }
 
-    const existing = await db.owners.get(id)
-    if (!existing) {
-      throw new Error(DB_ERROR.OWNER_NOT_FOUND)
-    }
+      const existing = await db.owners.get(id)
+      if (!existing) {
+        throw new Error(DB_ERROR.OWNER_NOT_FOUND)
+      }
 
-    await db.notes.delete(['owner', id])
-    await db.tagApplications.where('[entityType+entityId]').equals(['owner', id]).delete()
-    await db.owners.delete(id)
-  })
+      await db.notes.delete(['owner', id])
+      await db.tagApplications.where('[entityType+entityId]').equals(['owner', id]).delete()
+      await deleteOwnerGallery(id)
+      await db.owners.delete(id)
+    }
+  )
 }
 
 export async function getOwnerById(id: string): Promise<Owner | undefined> {
   return db.owners.get(id)
+}
+
+async function deleteOwnerGallery(ownerId: string): Promise<void> {
+  const items = await db.entityGalleryItems
+    .where('[entityType+entityId]')
+    .equals(['owner', ownerId])
+    .toArray()
+
+  for (const item of items) {
+    await db.entityGalleryAssets.where('itemId').equals(item.id).delete()
+  }
+
+  if (items.length > 0) {
+    await db.entityGalleryItems.bulkDelete(items.map((item) => item.id))
+  }
 }

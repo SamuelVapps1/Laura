@@ -7,6 +7,8 @@ export type NoteScope = "appointment" | "owner" | "dog"
 export type TagScope = "appointment" | "owner" | "dog"
 export type PhotoKind = "before" | "after"
 export type PhotoVariant = "full" | "thumb"
+export type GalleryEntityType = "owner" | "dog"
+export type GalleryPhotoVariant = "full" | "thumb"
 
 export interface Owner {
   id: EntityId
@@ -130,6 +132,27 @@ export interface PhotoAsset {
   createdAt: ISODateTime
 }
 
+export interface EntityGalleryItem {
+  id: EntityId
+  entityType: GalleryEntityType
+  entityId: EntityId
+  caption: string | null
+  createdAt: ISODateTime
+  updatedAt: ISODateTime
+}
+
+export interface EntityGalleryAsset {
+  id: EntityId
+  itemId: EntityId
+  variant: GalleryPhotoVariant
+  blob: Blob
+  mimeType: "image/webp"
+  width: number | null
+  height: number | null
+  sizeBytes: number
+  createdAt: ISODateTime
+}
+
 export type NewOwnerInput = {
   fullName: string
   phone?: string | null
@@ -156,7 +179,7 @@ export type NewDogInput = {
 
 export type UpdateDogInput = Partial<NewDogInput>
 
-export const DB_SCHEMA_VERSION = 6
+export const DB_SCHEMA_VERSION = 7
 
 class SalonDatabase extends Dexie {
   owners!: Table<Owner, string>
@@ -170,6 +193,8 @@ class SalonDatabase extends Dexie {
   tagApplications!: Table<TagApplication, [EntityId, TagScope, EntityId]>
   photoSessions!: Table<PhotoSession, string>
   photos!: Table<PhotoAsset, string>
+  entityGalleryItems!: Table<EntityGalleryItem, string>
+  entityGalleryAssets!: Table<EntityGalleryAsset, string>
 
   constructor() {
     super('salon-app-db')
@@ -315,6 +340,21 @@ class SalonDatabase extends Dexie {
           owner.gdprConsent = false
         }
       })
+    })
+    this.version(7).stores({
+      owners: 'id, fullName, phone, createdAt, updatedAt, _search',
+      dogs: 'id, ownerId, name, breed, createdAt, updatedAt, _search',
+      appointments: 'id, dogId, ownerId, startsAt, endsAt, status, createdAt, updatedAt, _search',
+      tags: 'id, name, createdAt, updatedAt, _search',
+      dogTags: 'id, dogId, tagId, [dogId+tagId]',
+      appSettings: 'key, updatedAt',
+      notes: '[scope+entityId], scope, entityId, updatedAt, _search',
+      tagDefinitions: 'id, label, updatedAt, _search, *scopes',
+      tagApplications: '[tagId+entityType+entityId], tagId, entityType, entityId, [entityType+entityId]',
+      photoSessions: 'id, appointmentId, dogId, updatedAt',
+      photos: 'id, sessionId, appointmentId, dogId, groupId, kind, variant, createdAt, [sessionId+kind], [sessionId+kind+variant], [dogId+sessionId]',
+      entityGalleryItems: 'id, entityType, entityId, [entityType+entityId], createdAt, updatedAt',
+      entityGalleryAssets: 'id, itemId, variant, [itemId+variant], createdAt',
     })
   }
 }

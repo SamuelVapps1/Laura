@@ -74,24 +74,52 @@ export async function updateDog(id: string, patch: UpdateDogInput): Promise<Dog>
 }
 
 export async function deleteDog(id: string): Promise<void> {
-  await db.transaction('rw', [db.dogs, db.appointments, db.notes, db.tagApplications, db.dogTags], async () => {
-    const existing = await db.dogs.get(id)
-    if (!existing) {
-      throw new Error(DB_ERROR.DOG_NOT_FOUND)
-    }
+  await db.transaction(
+    'rw',
+    [
+      db.dogs,
+      db.appointments,
+      db.notes,
+      db.tagApplications,
+      db.dogTags,
+      db.entityGalleryItems,
+      db.entityGalleryAssets,
+    ],
+    async () => {
+      const existing = await db.dogs.get(id)
+      if (!existing) {
+        throw new Error(DB_ERROR.DOG_NOT_FOUND)
+      }
 
-    const appointmentCount = await db.appointments.where('dogId').equals(id).count()
-    if (appointmentCount > 0) {
-      throw new Error(DB_ERROR.DOG_HAS_APPOINTMENTS)
-    }
+      const appointmentCount = await db.appointments.where('dogId').equals(id).count()
+      if (appointmentCount > 0) {
+        throw new Error(DB_ERROR.DOG_HAS_APPOINTMENTS)
+      }
 
-    await db.notes.delete(['dog', id])
-    await db.tagApplications.where('[entityType+entityId]').equals(['dog', id]).delete()
-    await db.dogTags.where('dogId').equals(id).delete()
-    await db.dogs.delete(id)
-  })
+      await db.notes.delete(['dog', id])
+      await db.tagApplications.where('[entityType+entityId]').equals(['dog', id]).delete()
+      await db.dogTags.where('dogId').equals(id).delete()
+      await deleteDogGallery(id)
+      await db.dogs.delete(id)
+    }
+  )
 }
 
 export async function getDogById(id: string): Promise<Dog | undefined> {
   return db.dogs.get(id)
+}
+
+async function deleteDogGallery(dogId: string): Promise<void> {
+  const items = await db.entityGalleryItems
+    .where('[entityType+entityId]')
+    .equals(['dog', dogId])
+    .toArray()
+
+  for (const item of items) {
+    await db.entityGalleryAssets.where('itemId').equals(item.id).delete()
+  }
+
+  if (items.length > 0) {
+    await db.entityGalleryItems.bulkDelete(items.map((item) => item.id))
+  }
 }
