@@ -4,6 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { DogFormDialog } from '@/components/dogs/DogFormDialog'
 import { OwnerDogSelect } from '@/components/dogs/OwnerDogSelect'
 import { OwnerSearchSelect } from '@/components/dogs/OwnerSearchSelect'
+import { EntityTagChips } from '@/components/tags/EntityTagChips'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -288,6 +289,7 @@ export function AppointmentFormDialog({
           <form onSubmit={handleSubmit}>
             <div className="grid gap-4 py-4">
               <OwnerSearchSelect owners={owners} value={ownerId} onChange={setOwnerId} />
+              {ownerId && <EntityTagChips entityType="owner" entityId={ownerId} />}
 
               {ownerId !== '' &&
                 (dogsForOwner.length === 0 ? (
@@ -298,7 +300,10 @@ export function AppointmentFormDialog({
                     </Button>
                   </div>
                 ) : (
-                  <OwnerDogSelect dogs={dogsForOwner} value={dogId} onChange={setDogId} />
+                  <>
+                    <OwnerDogSelect dogs={dogsForOwner} value={dogId} onChange={setDogId} />
+                    {dogId && <EntityTagChips entityType="dog" entityId={dogId} />}
+                  </>
                 ))}
 
               {!ownerId && <p className="text-xs text-muted-foreground">{t('selectOwnerFirst')}</p>}
