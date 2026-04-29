@@ -59,7 +59,7 @@ export function OwnerFormDialog({ open, onOpenChange, owner, onSuccess }: OwnerF
       onSuccess?.()
       onOpenChange(false)
       resetForm()
-    } catch (err) {
+    } catch {
       setError(t('validationError'))
     } finally {
       setIsSaving(false)

@@ -1,4 +1,4 @@
-import { Component, type ErrorInfo, type ReactNode } from 'react'
+import { Component, type ReactNode } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { t } from '@/i18n/sk'
@@ -29,8 +29,6 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       errorStack: error instanceof Error ? error.stack ?? null : null,
     }
   }
-
-  componentDidCatch(_error: unknown, _info: ErrorInfo) {}
 
   handleReload = () => {
     window.location.reload()

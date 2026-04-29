@@ -1,7 +1,7 @@
 import { liveQuery, type Subscription } from 'dexie'
 import { Document, type Id } from 'flexsearch'
 
-import type { Appointment, Dog, Owner, TagApplication, TagDefinition, TagScope } from '@/db/db'
+import type { Appointment, Dog, Owner, TagApplication, TagDefinition } from '@/db/db'
 import { db } from '@/db/db'
 import { normalizeSearchText } from '@/db/search'
 import { formatAppointmentDateTime, getAppointmentStatusLabel, toDateInputValue } from '@/lib/appointments'
