@@ -1,4 +1,13 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
+import {
+  Activity,
+  Archive,
+  HardDrive,
+  Info,
+  Lock,
+  Store,
+  type LucideIcon,
+} from 'lucide-react'
 
 import { useAuth } from '@/auth/AuthProvider'
 import { useAppBusy } from '@/context/AppBusyContext'
@@ -57,6 +66,30 @@ type MessageState = {
   tone: 'success' | 'error'
 } | null
 
+function SettingsCardHeader({
+  icon: Icon,
+  title,
+  description,
+}: {
+  icon: LucideIcon
+  title: string
+  description?: string
+}) {
+  return (
+    <CardHeader>
+      <div className="flex items-start gap-3">
+        <div className="rounded-md bg-gray-100 p-2 text-gray-600">
+          <Icon className="h-4 w-4" aria-hidden="true" />
+        </div>
+        <div>
+          <CardTitle>{title}</CardTitle>
+          {description && <CardDescription className="mt-1">{description}</CardDescription>}
+        </div>
+      </div>
+    </CardHeader>
+  )
+}
+
 export function SettingsPage() {
   const auth = useAuth()
   const { startBusy, endBusy } = useAppBusy()
@@ -83,6 +116,7 @@ export function SettingsPage() {
   const [salonNameLoading, setSalonNameLoading] = useState(true)
   const [salonNameSaving, setSalonNameSaving] = useState(false)
   const [salonNameMessage, setSalonNameMessage] = useState<MessageState>(null)
+  const [storageRefreshing, setStorageRefreshing] = useState(false)
 
   const refreshStorageEstimate = useCallback(async () => {
     if (!navigator.storage || typeof navigator.storage.estimate !== 'function') {
@@ -102,29 +136,22 @@ export function SettingsPage() {
     }
   }, [])
 
+  const refreshPersistentStorageStatus = useCallback(async () => {
+    try {
+      const status = await getStoredPersistentStorageStatus()
+      setPersistentStorageStatus(status)
+    } catch {
+      setPersistentStorageStatus(null)
+    }
+  }, [])
+
   useEffect(() => {
     void refreshStorageEstimate()
   }, [refreshStorageEstimate])
 
   useEffect(() => {
-    let active = true
-
-    void getStoredPersistentStorageStatus()
-      .then((status) => {
-        if (active) {
-          setPersistentStorageStatus(status)
-        }
-      })
-      .catch(() => {
-        if (active) {
-          setPersistentStorageStatus(null)
-        }
-      })
-
-    return () => {
-      active = false
-    }
-  }, [])
+    void refreshPersistentStorageStatus()
+  }, [refreshPersistentStorageStatus])
 
   const refreshDiagnostics = useCallback(async () => {
     setDiagnosticsLoading(true)
@@ -176,6 +203,20 @@ export function SettingsPage() {
       setSalonNameMessage({ key: 'validationError', tone: 'error' })
     } finally {
       setSalonNameSaving(false)
+    }
+  }
+
+  const handleRefreshStorageInfo = async () => {
+    if (storageRefreshing) return
+
+    setStorageRefreshing(true)
+    try {
+      await Promise.all([
+        refreshStorageEstimate(),
+        refreshPersistentStorageStatus(),
+      ])
+    } finally {
+      setStorageRefreshing(false)
     }
   }
 
@@ -370,10 +411,11 @@ export function SettingsPage() {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>{t('settingsSalonTitle')}</CardTitle>
-          <CardDescription>{t('settingsSalonDescription')}</CardDescription>
-        </CardHeader>
+        <SettingsCardHeader
+          icon={Store}
+          title={t('settingsSalonTitle')}
+          description={t('settingsSalonDescription')}
+        />
         <CardContent>
           <form className="space-y-3" onSubmit={handleSalonNameSubmit}>
             <div className="space-y-2">
@@ -399,16 +441,21 @@ export function SettingsPage() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>{t('settingsBackupTitle')}</CardTitle>
-          <CardDescription>{t('aboutOfflineFirst')}</CardDescription>
-        </CardHeader>
+        <SettingsCardHeader
+          icon={Archive}
+          title={t('settingsBackupTitle')}
+          description={t('settingsBackupDescription')}
+        />
         <CardContent className="space-y-4">
-          <div className="flex flex-col gap-3 sm:flex-row">
+          <p className="text-sm text-gray-600">{t('settingsBackupExportHint')}</p>
+
+          <div className="flex flex-wrap gap-3">
             <Button type="button" onClick={handleOpenExportDialog} disabled={isBusy}>
               {t('downloadEncryptedBackup')}
             </Button>
           </div>
+
+          <p className="text-sm text-gray-600">{t('settingsBackupRestoreHint')}</p>
 
           <div className="grid gap-3 sm:max-w-lg">
             <Label htmlFor="backup-file">{t('chooseBackupFile')}</Label>
@@ -448,19 +495,32 @@ export function SettingsPage() {
       <PasswordSection />
 
       <Card>
-        <CardHeader>
-          <CardTitle>{t('settingsStorageTitle')}</CardTitle>
-        </CardHeader>
-        <CardContent>
+        <SettingsCardHeader
+          icon={HardDrive}
+          title={t('settingsStorageTitle')}
+          description={t('settingsStorageDescription')}
+        />
+        <CardContent className="space-y-4">
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void handleRefreshStorageInfo()}
+              disabled={storageRefreshing}
+            >
+              {t('storageRefresh')}
+            </Button>
+          </div>
           <StorageUsage storageInfo={storageInfo} persistentStorageStatus={persistentStorageStatus} />
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>{t('diagnosticsTitle')}</CardTitle>
-          <CardDescription>{t('diagnosticsDescription')}</CardDescription>
-        </CardHeader>
+        <SettingsCardHeader
+          icon={Activity}
+          title={t('diagnosticsTitle')}
+          description={t('settingsDiagnosticsDescription')}
+        />
         <CardContent className="space-y-4">
           <div className="flex justify-end">
             <Button type="button" variant="outline" onClick={() => void refreshDiagnostics()} disabled={diagnosticsLoading}>
@@ -477,9 +537,11 @@ export function SettingsPage() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>{t('settingsAboutTitle')}</CardTitle>
-        </CardHeader>
+        <SettingsCardHeader
+          icon={Info}
+          title={t('settingsAboutTitle')}
+          description={t('settingsAboutDescription')}
+        />
         <CardContent className="space-y-2 text-sm text-gray-600">
           <p>{t('appName')}</p>
           <p>
@@ -614,17 +676,18 @@ function PasswordSection() {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>{t('settingsPasswordTitle')}</CardTitle>
-        <CardDescription>{t('passwordSectionDescription')}</CardDescription>
-      </CardHeader>
+      <SettingsCardHeader
+        icon={Lock}
+        title={t('settingsPasswordTitle')}
+        description={t('settingsPasswordDescription')}
+      />
       <CardContent className="space-y-4">
         <p className="rounded-md border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900">
           {t('passwordLockOnlyNotice')}
         </p>
 
         {auth.loading ? (
-          <p className="text-sm text-gray-600">…</p>
+          <p className="text-sm text-gray-600">{t('processingGeneric')}</p>
         ) : auth.passwordEnabled ? (
           <>
             <p className="text-sm font-medium text-green-700">{t('passwordEnabled')}</p>
@@ -1024,7 +1087,7 @@ function StorageUsage({
             <span className="font-medium text-gray-900">{t('storagePersistentStatus')}: </span>
             <span className="text-gray-700">{getPersistentStorageStatusLabel(persistentStorageStatus)}</span>
           </p>
-          <p className="text-xs text-gray-600">{t('storagePersistentRequested')}</p>
+          <p className="text-xs text-gray-600">{getPersistentStorageStatusDescription(persistentStorageStatus)}</p>
         </div>
       )}
     </div>
@@ -1089,6 +1152,19 @@ function getPersistentStorageStatusLabel(status: StoragePersistStatus): string {
       return t('storagePersistentUnsupported')
     default:
       return t('storagePersistentDenied')
+  }
+}
+
+function getPersistentStorageStatusDescription(status: StoragePersistStatus): string {
+  switch (status) {
+    case 'granted':
+      return t('storagePersistentGrantedDescription')
+    case 'denied':
+      return t('storagePersistentDeniedDescription')
+    case 'unsupported':
+      return t('storagePersistentUnsupportedDescription')
+    default:
+      return t('storagePersistentDeniedDescription')
   }
 }
 
