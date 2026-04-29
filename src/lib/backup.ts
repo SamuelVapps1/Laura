@@ -865,7 +865,7 @@ function validateTagDefinition(value: unknown): asserts value is TagDefinition {
     throw new BackupError('invalid_file')
   }
 
-  const normalized = normalizeBackupTagDefinition(record as unknown as TagDefinition)
+  const normalized = normalizeBackupTagDefinition({ isActive: record.isActive as boolean | undefined })
   record.isActive = normalized.isActive
 }
 
@@ -1089,7 +1089,7 @@ function ensureUniqueValues(values: string[]): void {
   })
 }
 
-function normalizeBackupTagDefinition(definition: TagDefinition): TagDefinition {
+function normalizeBackupTagDefinition<T extends { isActive?: boolean }>(definition: T): T & { isActive: boolean } {
   return {
     ...definition,
     isActive: definition.isActive ?? true,

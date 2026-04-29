@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 
 import type { TagScope } from '@/db/db'
 import { db } from '@/db/db'
 import { DB_ERROR } from '@/db/errors'
-import { toggleTagApplication } from '@/db/repositories/tags'
+import { removeTag, toggleTagApplication } from '@/db/repositories/tags'
 import { t } from '@/i18n/sk'
 import {
   getReadableTagTextColor,
@@ -21,7 +21,8 @@ interface TagPickerProps {
 
 export function TagPicker({ entityType, entityId }: TagPickerProps) {
   const [error, setError] = useState<string | null>(null)
-  const [pendingTagIds, setPendingTagIds] = useState<Set<string>>(() => new Set())
+  const [pendingTagKeys, setPendingTagKeys] = useState<Set<string>>(() => new Set())
+  const pendingTagKeysRef = useRef<Set<string>>(new Set())
 
   const allTagDefinitions = useLiveQuery(
     () => db.tagDefinitions.toArray(),
@@ -55,29 +56,42 @@ export function TagPicker({ entityType, entityId }: TagPickerProps) {
   }, [visibleTagDefinitions, appliedTagIds])
 
   const handleToggle = async (tagId: string) => {
-    if (pendingTagIds.has(tagId)) return
-    const tag = allTagDefinitions.find((definition) => definition.id === tagId)
-    if (!tag) return
+    const pendingKey = getPendingKey(entityType, entityId, tagId)
+    if (pendingTagKeysRef.current.has(pendingKey)) return
 
-    if (!isTagDefinitionActive(tag)) {
-      const existing = await db.tagApplications.get([tagId, entityType, entityId])
-      if (!existing) return
-    }
-
+    pendingTagKeysRef.current.add(pendingKey)
+    setPendingTagKeys((current) => new Set(current).add(pendingKey))
     setError(null)
-    setPendingTagIds((current) => new Set(current).add(tagId))
+
+    const tag = allTagDefinitions.find((definition) => definition.id === tagId)
+
     try {
+      if (!tag) return
+
+      if (!isTagDefinitionActive(tag)) {
+        const existing = await db.tagApplications.get([tagId, entityType, entityId])
+        if (!existing) return
+        await removeTag(entityType, entityId, tagId)
+        return
+      }
+
       await toggleTagApplication(entityType, entityId, tagId)
     } catch (err) {
       setError(getTagPickerError(err))
     } finally {
-      setPendingTagIds((current) => {
+      pendingTagKeysRef.current.delete(pendingKey)
+      setPendingTagKeys((current) => {
         const next = new Set(current)
-        next.delete(tagId)
+        next.delete(pendingKey)
         return next
       })
     }
   }
+
+  useEffect(() => {
+    pendingTagKeysRef.current.clear()
+    setPendingTagKeys(new Set())
+  }, [entityType, entityId])
 
   if (sortedTagDefinitions.length === 0) {
     return <p className="text-sm text-muted-foreground">{t('emptyTagPicker')}</p>
@@ -88,7 +102,7 @@ export function TagPicker({ entityType, entityId }: TagPickerProps) {
       <div className="flex flex-wrap gap-2">
         {sortedTagDefinitions.map((tag) => {
           const isApplied = appliedTagIds.has(tag.id)
-          const isPending = pendingTagIds.has(tag.id)
+          const isPending = pendingTagKeys.has(getPendingKey(entityType, entityId, tag.id))
           return (
             <button
               key={tag.id}
@@ -118,6 +132,10 @@ export function TagPicker({ entityType, entityId }: TagPickerProps) {
       {error && <p className="text-sm text-red-500">{error}</p>}
     </div>
   )
+}
+
+function getPendingKey(entityType: TagScope, entityId: string, tagId: string): string {
+  return `${entityType}:${entityId}:${tagId}`
 }
 
 function getTagPickerError(error: unknown): string {
