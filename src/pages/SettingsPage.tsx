@@ -21,6 +21,10 @@ import {
   setPassword as setPasswordRecord,
 } from '@/db/repositories/password'
 import {
+  getSalonNameSetting,
+  setSalonNameSetting,
+} from '@/db/repositories/settings'
+import {
   BACKUP_VERSION,
   BackupError,
   exportBackup,
@@ -75,6 +79,10 @@ export function SettingsPage() {
     useState<TranslationKey | null>(null)
   const [diagnostics, setDiagnostics] = useState<DiagnosticsSnapshot | null>(null)
   const [diagnosticsLoading, setDiagnosticsLoading] = useState(false)
+  const [salonName, setSalonName] = useState('')
+  const [salonNameLoading, setSalonNameLoading] = useState(true)
+  const [salonNameSaving, setSalonNameSaving] = useState(false)
+  const [salonNameMessage, setSalonNameMessage] = useState<MessageState>(null)
 
   const refreshStorageEstimate = useCallback(async () => {
     if (!navigator.storage || typeof navigator.storage.estimate !== 'function') {
@@ -131,6 +139,45 @@ export function SettingsPage() {
   useEffect(() => {
     void refreshDiagnostics()
   }, [refreshDiagnostics])
+
+  useEffect(() => {
+    let active = true
+
+    void getSalonNameSetting()
+      .then((value) => {
+        if (!active) return
+        setSalonName(value ?? '')
+      })
+      .catch(() => {
+        if (!active) return
+        setSalonName('')
+      })
+      .finally(() => {
+        if (active) setSalonNameLoading(false)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const handleSalonNameSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (salonNameSaving) return
+
+    setSalonNameSaving(true)
+    setSalonNameMessage(null)
+
+    try {
+      await setSalonNameSetting(salonName)
+      setSalonName((await getSalonNameSetting()) ?? '')
+      setSalonNameMessage({ key: 'saveSuccess', tone: 'success' })
+    } catch {
+      setSalonNameMessage({ key: 'validationError', tone: 'error' })
+    } finally {
+      setSalonNameSaving(false)
+    }
+  }
 
   const clearExportPasswordFields = () => {
     setExportPassword('')
@@ -321,6 +368,35 @@ export function SettingsPage() {
         <h1 className="text-2xl font-bold text-gray-900">{t('pageSettingsTitle')}</h1>
         <p className="mt-2 text-gray-600">{t('pageSettingsDescription')}</p>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('settingsSalonTitle')}</CardTitle>
+          <CardDescription>{t('settingsSalonDescription')}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form className="space-y-3" onSubmit={handleSalonNameSubmit}>
+            <div className="space-y-2">
+              <Label htmlFor="settings-salon-name">{t('labelSalonName')}</Label>
+              <Input
+                id="settings-salon-name"
+                value={salonName}
+                onChange={(event) => setSalonName(event.target.value)}
+                placeholder={t('appName')}
+                disabled={salonNameLoading || salonNameSaving}
+              />
+            </div>
+            <Button type="submit" disabled={salonNameLoading || salonNameSaving}>
+              {salonNameSaving ? t('buttonSaving') : t('buttonSave')}
+            </Button>
+            {salonNameMessage && (
+              <div className={getMessageClassName(salonNameMessage.tone)}>
+                <p className="text-sm font-medium">{t(salonNameMessage.key)}</p>
+              </div>
+            )}
+          </form>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

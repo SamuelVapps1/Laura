@@ -42,6 +42,33 @@
     background: #ffffff !important;
   }
 
+  [data-print-section='day-schedule'] header {
+    display: block !important;
+    margin-bottom: 8mm;
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  [data-print-section='day-schedule'] dl {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4mm;
+    margin-bottom: 6mm;
+  }
+
+  [data-print-section='day-schedule'] dt {
+    font-size: 10px;
+    color: #4b5563 !important;
+    margin-bottom: 1mm;
+  }
+
+  [data-print-section='day-schedule'] dd {
+    font-size: 14px;
+    font-weight: 600;
+    color: #000000 !important;
+    margin: 0;
+  }
+
   [data-print-section='day-schedule'] .print-appointment-row {
     break-inside: avoid;
     page-break-inside: avoid;

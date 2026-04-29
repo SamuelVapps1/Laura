@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { endOfDay, format, startOfDay } from 'date-fns'
 import { sk } from 'date-fns/locale'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -10,11 +10,13 @@ import { Button } from '@/components/ui/button'
 import type { Appointment, Dog, Owner } from '@/db/db'
 import { db } from '@/db/db'
 import { getOwnerTipStatsMap } from '@/db/repositories/ownerStats'
+import { getSalonNameOrFallback } from '@/db/repositories/settings'
 import { t } from '@/i18n/sk'
 import {
   APPOINTMENT_STATUS_COLORS,
   formatAppointmentPrice,
   formatAppointmentTime,
+  getAppointmentDurationMinutes,
   getAppointmentStatusLabel,
 } from '@/lib/appointments'
 import { cn } from '@/lib/utils'
@@ -84,6 +86,33 @@ export function DayAppointmentsPane({
     [dayStartIso, dayEndIso],
     []
   )
+
+  const salonName = useLiveQuery(
+    () => getSalonNameOrFallback(t('appName')),
+    [],
+    t('appName')
+  )
+
+  const printSummary = useMemo(() => {
+    const totalMinutes = items.reduce(
+      (sum, { appointment }) => sum + getAppointmentDurationMinutes(appointment),
+      0
+    )
+
+    const expectedRevenue = items.reduce((sum, { appointment }) => {
+      if (appointment.status !== 'scheduled' && appointment.status !== 'done') {
+        return sum
+      }
+
+      return sum + (appointment.price ?? 0)
+    }, 0)
+
+    return {
+      count: items.length,
+      totalMinutes,
+      expectedRevenue,
+    }
+  }, [items])
 
   useEffect(() => {
     if (!menuState) return
@@ -255,10 +284,27 @@ export function DayAppointmentsPane({
       )}
 
       <section className="hidden print:block" data-print-section="day-schedule">
-        <h1 className="text-2xl font-semibold">{t('dailySchedule')}</h1>
-        <p className="mt-1 text-sm">
-          {format(selectedDate, 'EEEE d. MMMM yyyy', { locale: sk })}
-        </p>
+        <header>
+          <h1 className="text-2xl font-semibold">{salonName}</h1>
+          <p className="mt-1 text-sm">
+            {format(selectedDate, 'EEEE d. MMMM yyyy', { locale: sk })}
+          </p>
+        </header>
+
+        <dl>
+          <div>
+            <dt>{t('printSummaryCount')}</dt>
+            <dd>{printSummary.count}</dd>
+          </div>
+          <div>
+            <dt>{t('printSummaryTotalMinutes')}</dt>
+            <dd>{printSummary.totalMinutes} min</dd>
+          </div>
+          <div>
+            <dt>{t('printSummaryExpectedRevenue')}</dt>
+            <dd>{formatAppointmentPrice(printSummary.expectedRevenue)}</dd>
+          </div>
+        </dl>
 
         {items.length > 0 ? (
           <div className="mt-4 space-y-3">
