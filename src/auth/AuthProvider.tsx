@@ -1,3 +1,5 @@
+/* eslint-disable react-refresh/only-export-components */
+// This file intentionally exports provider and hook helpers together for its public API.
 import {
   createContext,
   useCallback,

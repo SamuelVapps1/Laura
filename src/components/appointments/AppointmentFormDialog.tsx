@@ -77,6 +77,8 @@ export function AppointmentFormDialog({
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
 
+  const appointmentId = appointment?.id ?? null
+
   useEffect(() => {
     if (!open) return
 
@@ -131,7 +133,7 @@ export function AppointmentFormDialog({
 
     let cancelled = false
 
-    if (!appointment) {
+    if (!appointmentId) {
       setSelectedTagIds([])
       setTagsExpanded(false)
       setAppointmentTagsLoaded(true)
@@ -144,7 +146,7 @@ export function AppointmentFormDialog({
     setAppointmentTagsLoaded(false)
     setAppointmentTagsLoadError(false)
 
-    void getTagApplicationsForEntity('appointment', appointment.id)
+    void getTagApplicationsForEntity('appointment', appointmentId)
       .then((applications) => {
         if (cancelled) return
         const ids = applications.map((application) => application.tagId)
@@ -161,7 +163,7 @@ export function AppointmentFormDialog({
     return () => {
       cancelled = true
     }
-  }, [open, appointment?.id])
+  }, [open, appointmentId])
 
   useEffect(() => {
     if (!open) return

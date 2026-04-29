@@ -65,14 +65,21 @@ export function DogGalleryPage() {
     },
     [dogId],
   )
-  const loadedGallerySessions = gallerySessions ?? []
+  const loadedGallerySessions = useMemo(
+    () => gallerySessions ?? [],
+    [gallerySessions],
+  )
   const visibleGallerySessions = useMemo(
     () => loadedGallerySessions.slice(0, visibleCount),
     [loadedGallerySessions, visibleCount],
   )
-  const selectedSession = selectedSessionId
-    ? loadedGallerySessions.find((row) => row.session.id === selectedSessionId) ?? null
-    : null
+  const selectedSession = useMemo(
+    () =>
+      selectedSessionId
+        ? loadedGallerySessions.find((row) => row.session.id === selectedSessionId) ?? null
+        : null,
+    [loadedGallerySessions, selectedSessionId],
+  )
 
   useEffect(() => {
     setVisibleCount(SESSIONS_PAGE_SIZE)

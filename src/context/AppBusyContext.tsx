@@ -1,3 +1,5 @@
+/* eslint-disable react-refresh/only-export-components */
+// This file intentionally exports provider, hook, and shared busy-task types together.
 import {
   createContext,
   useCallback,

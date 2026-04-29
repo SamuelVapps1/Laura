@@ -79,10 +79,7 @@ export function GlobalSearch() {
   const trimmedQuery = query.trim()
   const trimmedDebouncedQuery = debouncedQuery.trim()
   const queryIsSearchable = trimmedDebouncedQuery.length >= MIN_QUERY_LENGTH
-  const groupedResults = useMemo(
-    () => queryIsSearchable ? searchAll(debouncedQuery) : emptyResults(),
-    [debouncedQuery, queryIsSearchable, version]
-  )
+  const groupedResults = queryIsSearchable ? searchAll(debouncedQuery) : emptyResults()
   const sections = useMemo(() => buildSections(groupedResults), [groupedResults])
   const flatResults = useMemo(() => sections.flatMap((section) => section.results), [sections])
   const showDropdown = open

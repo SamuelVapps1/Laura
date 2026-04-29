@@ -15,14 +15,24 @@ interface DogSearchSelectProps {
 }
 
 export function DogSearchSelect({ dogs, owners, value, onChange }: DogSearchSelectProps) {
-  const selectedDog = dogs.find((dog) => dog.id === value)
-  const selectedOwner = selectedDog ? owners.find((owner) => owner.id === selectedDog.ownerId) : undefined
-  const [query, setQuery] = useState(getDogOptionLabel(selectedDog, selectedOwner))
+  const selectedDog = useMemo(
+    () => dogs.find((dog) => dog.id === value),
+    [dogs, value],
+  )
+  const selectedOwner = useMemo(
+    () => selectedDog ? owners.find((owner) => owner.id === selectedDog.ownerId) : undefined,
+    [owners, selectedDog],
+  )
+  const selectedDogLabel = useMemo(
+    () => getDogOptionLabel(selectedDog, selectedOwner),
+    [selectedDog, selectedOwner],
+  )
+  const [query, setQuery] = useState(selectedDogLabel)
   const [isOpen, setIsOpen] = useState(false)
 
   useEffect(() => {
-    setQuery(getDogOptionLabel(selectedDog, selectedOwner))
-  }, [selectedDog?.id, selectedDog?.name, selectedOwner?.id, selectedOwner?.fullName])
+    setQuery(selectedDogLabel)
+  }, [selectedDogLabel])
 
   const filteredDogs = useMemo(() => {
     const normalizedQuery = normalizeSearchText(query)
@@ -51,7 +61,7 @@ export function DogSearchSelect({ dogs, owners, value, onChange }: DogSearchSele
     setQuery(nextQuery)
     setIsOpen(true)
 
-    if (value && normalizeSearchText(nextQuery) !== normalizeSearchText(getDogOptionLabel(selectedDog, selectedOwner))) {
+    if (value && normalizeSearchText(nextQuery) !== normalizeSearchText(selectedDogLabel)) {
       onChange('')
     }
   }
