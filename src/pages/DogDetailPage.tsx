@@ -131,7 +131,9 @@ export function DogDetailPage() {
         </CardContent>
       </Card>
 
-      <DogNotesCard dog={dog} />
+      <DisclosureSection title={t('dogNotesSection')} openLabel={t('openNotes')}>
+        <DogNotesPanel dog={dog} />
+      </DisclosureSection>
 
       <EntityGallerySection
         entityType="dog"
@@ -199,7 +201,7 @@ export function DogDetailPage() {
   )
 }
 
-function DogNotesCard({ dog }: { dog: Dog }) {
+function DogNotesPanel({ dog }: { dog: Dog }) {
   const rows = [
     { label: t('labelBehaviorNotes'), value: dog.behaviorNotes },
     { label: t('labelHealthNotes'), value: dog.healthNotes },
@@ -208,18 +210,13 @@ function DogNotesCard({ dog }: { dog: Dog }) {
   ].filter((row): row is { label: string; value: string } => Boolean(row.value))
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">{t('dogNotesSection')}</CardTitle>
-      </CardHeader>
-      <CardContent className="grid gap-3 text-sm">
-        {rows.length === 0 ? (
-          <p className="text-muted-foreground">{t('noDogNotes')}</p>
-        ) : (
-          rows.map((row) => <DetailRow key={row.label} label={row.label} value={row.value} />)
-        )}
-      </CardContent>
-    </Card>
+    <div className="grid gap-3 text-sm">
+      {rows.length === 0 ? (
+        <p className="text-muted-foreground">{t('noDogNotes')}</p>
+      ) : (
+        rows.map((row) => <DetailRow key={row.label} label={row.label} value={row.value} />)
+      )}
+    </div>
   )
 }
 
