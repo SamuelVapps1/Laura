@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 
 import { DogFormDialog } from '@/components/dogs/DogFormDialog'
+import { DogNotesSummary } from '@/components/dogs/DogNotesSummary'
 import { EntityTagChips } from '@/components/tags/EntityTagChips'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -77,7 +78,7 @@ export function OwnerDogsSection({ ownerId }: OwnerDogsSectionProps) {
                       </span>
                     </div>
                     <EntityTagChips entityType="dog" entityId={dog.id} />
-                    <DogNotesSummary dog={dog} />
+                    <DogNotesSummary dog={dog} compact maxLength={160} />
                   </div>
                   <div className="flex shrink-0 gap-2">
                     <Button asChild variant="outline" size="sm">
@@ -103,27 +104,5 @@ export function OwnerDogsSection({ ownerId }: OwnerDogsSectionProps) {
         lockOwner
       />
     </>
-  )
-}
-
-function DogNotesSummary({ dog }: { dog: Dog }) {
-  const rows = [
-    { label: t('labelBehaviorNotes'), value: dog.behaviorNotes },
-    { label: t('labelHealthNotes'), value: dog.healthNotes },
-    { label: t('labelGroomingNotes'), value: dog.groomingNotes },
-    { label: t('labelPriceNotes'), value: dog.priceNotes },
-  ].filter((row): row is { label: string; value: string } => Boolean(row.value))
-
-  if (rows.length === 0) return null
-
-  return (
-    <div className="mt-2 space-y-1 text-xs text-muted-foreground">
-      {rows.map((row) => (
-        <p key={row.label}>
-          <span className="font-medium text-gray-700">{row.label}: </span>
-          {row.value}
-        </p>
-      ))}
-    </div>
   )
 }

@@ -5,12 +5,13 @@ import { useLiveQuery } from 'dexie-react-hooks'
 
 import { DisclosureSection } from '@/components/DisclosureSection'
 import { DogFormDialog } from '@/components/dogs/DogFormDialog'
+import { DogNotesSummary } from '@/components/dogs/DogNotesSummary'
 import { OwnerTipBadge } from '@/components/owners/OwnerTipBadge'
 import { EntityGallerySection } from '@/components/photos/EntityGallerySection'
 import { TagPicker } from '@/components/TagPicker'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { db, type Appointment, type Dog } from '@/db/db'
+import { db, type Appointment } from '@/db/db'
 import { getOwnerTipStats } from '@/db/repositories/ownerStats'
 import { t } from '@/i18n/sk'
 import {
@@ -132,7 +133,10 @@ export function DogDetailPage() {
       </Card>
 
       <DisclosureSection title={t('dogNotesSection')} openLabel={t('openNotes')}>
-        <DogNotesPanel dog={dog} />
+        <DogNotesSummary
+          dog={dog}
+          emptyFallback={<p className="text-muted-foreground">{t('noDogNotes')}</p>}
+        />
       </DisclosureSection>
 
       <EntityGallerySection
@@ -197,25 +201,6 @@ export function DogDetailPage() {
         dog={dog}
         owners={owners}
       />
-    </div>
-  )
-}
-
-function DogNotesPanel({ dog }: { dog: Dog }) {
-  const rows = [
-    { label: t('labelBehaviorNotes'), value: dog.behaviorNotes },
-    { label: t('labelHealthNotes'), value: dog.healthNotes },
-    { label: t('labelGroomingNotes'), value: dog.groomingNotes },
-    { label: t('labelPriceNotes'), value: dog.priceNotes },
-  ].filter((row): row is { label: string; value: string } => Boolean(row.value))
-
-  return (
-    <div className="grid gap-3 text-sm">
-      {rows.length === 0 ? (
-        <p className="text-muted-foreground">{t('noDogNotes')}</p>
-      ) : (
-        rows.map((row) => <DetailRow key={row.label} label={row.label} value={row.value} />)
-      )}
     </div>
   )
 }

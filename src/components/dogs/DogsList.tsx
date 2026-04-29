@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 
+import { DogNotesSummary } from '@/components/dogs/DogNotesSummary'
 import { EmptyState } from '@/components/EmptyState'
 import { t } from '@/i18n/sk'
 import { Button } from '@/components/ui/button'
@@ -68,7 +69,17 @@ export function DogsList({
           <TableBody>
             {dogs.map((dog) => (
               <TableRow key={dog.id}>
-                <TableCell className="font-medium">{dog.name}</TableCell>
+                <TableCell className="font-medium">
+                  <div className="space-y-1">
+                    <span>{dog.name}</span>
+                    <DogNotesSummary
+                      dog={dog}
+                      compact
+                      maxLength={120}
+                      emptyFallback={<span className="block text-xs font-normal text-muted-foreground">-</span>}
+                    />
+                  </div>
+                </TableCell>
                 <TableCell>{getOwnerName(dog.ownerId)}</TableCell>
                 <TableCell>{dog.breed || '-'}</TableCell>
                 <TableCell>{t(dog.sex === 'male' ? 'labelSexMale' : dog.sex === 'female' ? 'labelSexFemale' : 'labelSexUnknown')}</TableCell>
