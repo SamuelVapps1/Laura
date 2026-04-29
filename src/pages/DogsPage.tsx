@@ -30,6 +30,12 @@ export function DogsPage() {
     []
   )
 
+  const totalDogsCount = useLiveQuery(
+    () => db.dogs.count(),
+    [],
+    0
+  )
+
   const handleAdd = () => {
     setEditingDog(undefined)
     setIsFormOpen(true)
@@ -68,6 +74,8 @@ export function DogsPage() {
         onEdit={handleEdit}
         onDelete={handleDelete}
         onCreate={handleAdd}
+        isSearchActive={normalizedSearch.length > 0}
+        hasAnyDogs={totalDogsCount > 0}
       />
 
       <DogFormDialog

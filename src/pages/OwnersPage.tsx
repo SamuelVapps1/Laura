@@ -24,6 +24,12 @@ export function OwnersPage() {
     []
   )
 
+  const totalOwnersCount = useLiveQuery(
+    () => db.owners.count(),
+    [],
+    0
+  )
+
   const handleAdd = () => {
     setEditingOwner(undefined)
     setIsFormOpen(true)
@@ -61,6 +67,8 @@ export function OwnersPage() {
         onEdit={handleEdit}
         onDelete={handleDelete}
         onCreate={handleAdd}
+        isSearchActive={normalizedSearch.length > 0}
+        hasAnyOwners={totalOwnersCount > 0}
       />
 
       <OwnerFormDialog

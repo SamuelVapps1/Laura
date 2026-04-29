@@ -16,9 +16,18 @@ interface OwnersListProps {
   onEdit: (owner: Owner) => void
   onDelete: (owner: Owner) => void
   onCreate?: () => void
+  isSearchActive?: boolean
+  hasAnyOwners?: boolean
 }
 
-export function OwnersList({ owners, onEdit, onDelete, onCreate }: OwnersListProps) {
+export function OwnersList({
+  owners,
+  onEdit,
+  onDelete,
+  onCreate,
+  isSearchActive = false,
+  hasAnyOwners = false,
+}: OwnersListProps) {
   const ownerIds = useMemo(() => owners.map((owner) => owner.id), [owners])
   const ownerIdsKey = useMemo(() => ownerIds.join('|'), [ownerIds])
   const emptyStatsMap = useMemo(() => new Map<string, OwnerTipStats>(), [])
@@ -30,6 +39,15 @@ export function OwnersList({ owners, onEdit, onDelete, onCreate }: OwnersListPro
   )
 
   if (owners.length === 0) {
+    if (hasAnyOwners && isSearchActive) {
+      return (
+        <EmptyState
+          title={t('emptyOwnersSearchTitle')}
+          description={t('emptySearchDescription')}
+        />
+      )
+    }
+
     return (
       <EmptyState
         title={t('emptyOwnersTitle')}

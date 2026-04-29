@@ -13,15 +13,34 @@ interface DogsListProps {
   onEdit: (dog: Dog) => void
   onDelete: (dog: Dog) => void
   onCreate?: () => void
+  isSearchActive?: boolean
+  hasAnyDogs?: boolean
 }
 
-export function DogsList({ dogs, owners, onEdit, onDelete, onCreate }: DogsListProps) {
+export function DogsList({
+  dogs,
+  owners,
+  onEdit,
+  onDelete,
+  onCreate,
+  isSearchActive = false,
+  hasAnyDogs = false,
+}: DogsListProps) {
   const getOwnerName = (ownerId: string) => {
     const owner = owners.find(o => o.id === ownerId)
     return owner?.fullName || '-'
   }
 
   if (dogs.length === 0) {
+    if (hasAnyDogs && isSearchActive) {
+      return (
+        <EmptyState
+          title={t('emptyDogsSearchTitle')}
+          description={t('emptySearchDescription')}
+        />
+      )
+    }
+
     return (
       <EmptyState
         title={t('emptyDogsTitle')}
