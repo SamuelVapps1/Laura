@@ -17,7 +17,6 @@ import { db } from '@/db/db'
 import { t } from '@/i18n/sk'
 import { toDateInputValue, toMonthInputValue } from '@/lib/appointments'
 import { cn } from '@/lib/utils'
-import '@/styles/print.css'
 
 export function CalendarPage() {
   const navigate = useNavigate()
