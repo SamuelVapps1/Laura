@@ -1,4 +1,4 @@
-// Password verifier helpers for the lock-only mode of Patch 9.
+// Password verifier helpers for lock-only mode.
 //
 // IMPORTANT: This is NOT at-rest encryption. The Dexie/IndexedDB data is
 // stored unencrypted on the device. The verifier below only proves that
@@ -6,8 +6,7 @@
 // content until they unlock the app. Real protection of the local data
 // still depends on the device account / OS-level protection.
 //
-// TODO: encryption mode in a future patch if real at-rest encryption is
-// implemented end-to-end.
+// Encrypted backup export is implemented separately in backup modules.
 
 export const PASSWORD_MIN_LENGTH = 6
 export const PASSWORD_PBKDF2_ITERATIONS = 250_000
