@@ -13,21 +13,23 @@ type DogTagSelectorProps = {
 }
 
 export function DogTagSelector({ selectedTagIds, onChange, disabled }: DogTagSelectorProps) {
-  const dogScopedTags = useLiveQuery(
+  const visibleDogTags = useLiveQuery(
     async () => {
       const all = await db.tagDefinitions.toArray()
-      return all
-        .filter((definition) => definition.scopes.includes('dog'))
+      const selectedSet = new Set(selectedTagIds)
+      const scoped = all.filter((definition) => definition.scopes.includes('dog'))
+      return scoped
+        .filter((definition) => definition.isActive !== false || selectedSet.has(definition.id))
         .sort((a, b) => a.label.localeCompare(b.label, 'sk'))
     },
-    [],
+    [selectedTagIds],
     []
   )
 
   const selectedSet = useMemo(() => new Set(selectedTagIds), [selectedTagIds])
   const sortedTags = useMemo(() => {
     const collator = new Intl.Collator('sk')
-    return [...dogScopedTags].sort((first, second) => {
+    return [...visibleDogTags].sort((first, second) => {
       const firstSelected = selectedSet.has(first.id)
       const secondSelected = selectedSet.has(second.id)
       if (firstSelected !== secondSelected) {
@@ -35,10 +37,17 @@ export function DogTagSelector({ selectedTagIds, onChange, disabled }: DogTagSel
       }
       return collator.compare(first.label, second.label)
     })
-  }, [dogScopedTags, selectedSet])
+  }, [visibleDogTags, selectedSet])
 
   const toggleTag = (tagId: string) => {
     if (disabled) return
+    const targetTag = visibleDogTags.find((tag) => tag.id === tagId)
+    if (!targetTag) return
+
+    if (targetTag.isActive === false && !selectedSet.has(tagId)) {
+      return
+    }
+
     const next = new Set(selectedTagIds)
     if (next.has(tagId)) {
       next.delete(tagId)
@@ -48,11 +57,11 @@ export function DogTagSelector({ selectedTagIds, onChange, disabled }: DogTagSel
     onChange(Array.from(next))
   }
 
-  if (!dogScopedTags) {
+  if (!visibleDogTags) {
     return <p className="text-sm text-muted-foreground">{t('dogTagsHint')}</p>
   }
 
-  if (dogScopedTags.length === 0) {
+  if (visibleDogTags.length === 0) {
     return (
       <div className="space-y-2">
         <p className="text-sm text-muted-foreground">{t('noDogTagsAvailable')}</p>
@@ -73,7 +82,7 @@ export function DogTagSelector({ selectedTagIds, onChange, disabled }: DogTagSel
               disabled={disabled}
               title={tag.description ?? undefined}
               className={cn(
-                'rounded-full border px-3 py-1 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-50'
+                'inline-flex items-center gap-1 rounded-full border px-3 py-1 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-50'
               )}
               style={{
                 backgroundColor: isSelected ? tag.color : 'transparent',
@@ -82,7 +91,12 @@ export function DogTagSelector({ selectedTagIds, onChange, disabled }: DogTagSel
               }}
               onClick={() => toggleTag(tag.id)}
             >
-              {tag.label}
+              <span>{tag.label}</span>
+              {tag.isActive === false && (
+                <span className="rounded-sm border border-current/40 px-1 py-0.5 text-[10px] leading-none">
+                  {t('tagInactiveBadge')}
+                </span>
+              )}
             </button>
           )
         })}

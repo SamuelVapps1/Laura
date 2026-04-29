@@ -14,12 +14,14 @@ export function TagsPage() {
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingTag, setEditingTag] = useState<TagDefinition | undefined>()
   const [deletingTag, setDeletingTag] = useState<TagDefinition | undefined>()
+  const [showInactiveTags, setShowInactiveTags] = useState(false)
 
   const tags = useLiveQuery(
     () => db.tagDefinitions.orderBy('label').toArray(),
     [],
     []
   )
+  const visibleTags = showInactiveTags ? tags : tags.filter((tag) => tag.isActive !== false)
 
   const handleAdd = () => {
     setEditingTag(undefined)
@@ -45,7 +47,17 @@ export function TagsPage() {
         <Button onClick={handleAdd}>{t('buttonAddTag')}</Button>
       </div>
 
-      {tags.length === 0 ? (
+      <label className="inline-flex items-center gap-2 text-sm font-medium">
+        <input
+          type="checkbox"
+          className="h-4 w-4 rounded border-input"
+          checked={showInactiveTags}
+          onChange={(event) => setShowInactiveTags(event.target.checked)}
+        />
+        {t('showInactiveTags')}
+      </label>
+
+      {visibleTags.length === 0 ? (
         <EmptyState
           title={t('emptyTagsTitle')}
           description={t('emptyTagsDescription')}
@@ -54,7 +66,7 @@ export function TagsPage() {
         />
       ) : (
         <TagDefinitionsList
-          tags={tags}
+          tags={visibleTags}
           onEdit={handleEdit}
           onDelete={handleDelete}
         />

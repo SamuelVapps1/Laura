@@ -524,7 +524,14 @@ export async function restoreBackup(
       current += 1
       reportProgress(onProgress, { stage: 'restoring', current, total: data.photos.length + 12 })
 
-      if (data.tagDefinitions.length > 0) await db.tagDefinitions.bulkAdd(data.tagDefinitions)
+      if (data.tagDefinitions.length > 0) {
+        await db.tagDefinitions.bulkAdd(
+          data.tagDefinitions.map((definition) => ({
+            ...definition,
+            isActive: definition.isActive ?? true,
+          }))
+        )
+      }
       current += 1
       reportProgress(onProgress, { stage: 'restoring', current, total: data.photos.length + 12 })
 
@@ -856,6 +863,15 @@ function validateTagDefinition(value: unknown): asserts value is TagDefinition {
       throw new BackupError('invalid_file')
     }
   })
+
+  if (record.isActive === undefined) {
+    record.isActive = true
+    return
+  }
+
+  if (typeof record.isActive !== 'boolean') {
+    throw new BackupError('invalid_file')
+  }
 }
 
 function validateTagApplication(value: unknown): asserts value is TagApplication {

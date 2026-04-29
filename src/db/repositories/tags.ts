@@ -9,6 +9,7 @@ export type NewTagDefinitionInput = {
   description?: string | null
   color: string
   scopes: TagScope[]
+  isActive?: boolean
 }
 
 export type UpdateTagDefinitionInput = Partial<NewTagDefinitionInput>
@@ -25,6 +26,7 @@ export async function createTagDefinition(input: NewTagDefinitionInput): Promise
     description: normalizeOptionalText(input.description),
     color,
     scopes,
+    isActive: input.isActive ?? true,
     createdAt: now,
     updatedAt: now,
     _search: '',
@@ -54,6 +56,7 @@ export async function updateTagDefinition(
         : existing.description,
       color: patch.color !== undefined ? validateColor(patch.color) : existing.color,
       scopes: patch.scopes !== undefined ? validateScopes(patch.scopes) : existing.scopes,
+      isActive: patch.isActive !== undefined ? patch.isActive : existing.isActive,
       updatedAt: new Date().toISOString(),
       _search: '',
     }

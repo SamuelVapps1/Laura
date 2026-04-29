@@ -92,6 +92,7 @@ export interface TagDefinition {
   description: string | null
   color: string
   scopes: TagScope[]
+  isActive: boolean
   createdAt: ISODateTime
   updatedAt: ISODateTime
   _search: string
@@ -153,7 +154,7 @@ export type NewDogInput = {
 
 export type UpdateDogInput = Partial<NewDogInput>
 
-export const DB_SCHEMA_VERSION = 4
+export const DB_SCHEMA_VERSION = 5
 
 class SalonDatabase extends Dexie {
   owners!: Table<Owner, string>
@@ -232,6 +233,7 @@ class SalonDatabase extends Dexie {
             description: null,
             color: normalizeLegacyTagColor(tag.color),
             scopes: ['dog'],
+            isActive: true,
             createdAt: tag.createdAt,
             updatedAt: tag.updatedAt,
             _search: normalizeSearchText([tag.name, 'dog', 'pes'].join(' ')),
@@ -271,6 +273,26 @@ class SalonDatabase extends Dexie {
       tagApplications: '[tagId+entityType+entityId], tagId, entityType, entityId, [entityType+entityId]',
       photoSessions: 'id, appointmentId, dogId, updatedAt',
       photos: 'id, sessionId, appointmentId, dogId, groupId, kind, variant, createdAt, [sessionId+kind], [sessionId+kind+variant], [dogId+sessionId]',
+    })
+    this.version(5).stores({
+      owners: 'id, fullName, phone, createdAt, updatedAt, _search',
+      dogs: 'id, ownerId, name, breed, createdAt, updatedAt, _search',
+      appointments: 'id, dogId, ownerId, startsAt, endsAt, status, createdAt, updatedAt, _search',
+      tags: 'id, name, createdAt, updatedAt, _search',
+      dogTags: 'id, dogId, tagId, [dogId+tagId]',
+      appSettings: 'key, updatedAt',
+      notes: '[scope+entityId], scope, entityId, updatedAt, _search',
+      tagDefinitions: 'id, label, updatedAt, _search, *scopes',
+      tagApplications: '[tagId+entityType+entityId], tagId, entityType, entityId, [entityType+entityId]',
+      photoSessions: 'id, appointmentId, dogId, updatedAt',
+      photos: 'id, sessionId, appointmentId, dogId, groupId, kind, variant, createdAt, [sessionId+kind], [sessionId+kind+variant], [dogId+sessionId]',
+    }).upgrade(async (transaction) => {
+      const tagDefinitions = transaction.table<TagDefinition, string>('tagDefinitions')
+      await tagDefinitions.toCollection().modify((definition) => {
+        if (definition.isActive === undefined) {
+          definition.isActive = true
+        }
+      })
     })
   }
 }

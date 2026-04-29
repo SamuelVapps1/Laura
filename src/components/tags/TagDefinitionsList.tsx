@@ -31,13 +31,14 @@ export function TagDefinitionsList({ tags, onEdit, onDelete }: TagDefinitionsLis
               <TableHead>{t('labelTagLabel')}</TableHead>
               <TableHead>{t('labelTagDescription')}</TableHead>
               <TableHead>{t('labelTagColor')}</TableHead>
+              <TableHead>{t('labelTagActive')}</TableHead>
               <TableHead>{t('labelTagScopes')}</TableHead>
               <TableHead className="text-right">{t('columnActions')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {tags.map((tag) => (
-              <TableRow key={tag.id}>
+              <TableRow key={tag.id} className={tag.isActive === false ? 'opacity-70' : undefined}>
                 <TableCell className="font-medium">{tag.label}</TableCell>
                 <TableCell>{tag.description || '-'}</TableCell>
                 <TableCell>
@@ -45,6 +46,15 @@ export function TagDefinitionsList({ tags, onEdit, onDelete }: TagDefinitionsLis
                     className="inline-flex h-5 w-5 rounded-full border"
                     style={{ backgroundColor: tag.color }}
                   />
+                </TableCell>
+                <TableCell>
+                  {tag.isActive === false ? (
+                    <span className="rounded-md border px-2 py-1 text-xs font-medium text-muted-foreground">
+                      {t('tagInactiveBadge')}
+                    </span>
+                  ) : (
+                    '-'
+                  )}
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-wrap gap-1">

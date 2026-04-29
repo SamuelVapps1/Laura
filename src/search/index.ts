@@ -278,7 +278,7 @@ function buildSearchIndex(snapshot: SearchSnapshot): void {
 
   for (const application of snapshot.tagApplications) {
     const tag = tagMap.get(application.tagId)
-    if (!tag) continue
+    if (!tag || tag.isActive === false) continue
 
     const tagResult = buildTagResult(application, tag, ownerMap, dogMap, appointmentMap)
     if (tagResult) {
