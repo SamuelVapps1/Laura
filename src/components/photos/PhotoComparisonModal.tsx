@@ -137,7 +137,13 @@ function PhotoPanel({
       <div className="border-b border-white/10 px-3 py-2 text-sm font-medium">{label}</div>
       <div className={cn('grid min-h-[220px] place-items-center', !url && 'p-6 text-sm text-neutral-400')}>
         {url ? (
-          <img src={url} alt={label} className="max-h-[50vh] w-full object-contain" />
+          <img
+            src={url}
+            alt={label}
+            loading="lazy"
+            decoding="async"
+            className="max-h-[50vh] w-full object-contain"
+          />
         ) : (
           missingLabel
         )}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { ImageIcon } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -19,10 +19,13 @@ type GallerySession = {
   afterThumb: PhotoAsset | null
 }
 
+const SESSIONS_PAGE_SIZE = 30
+
 export function DogGalleryPage() {
   const { dogId = '' } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
   const selectedSessionId = searchParams.get('session')
+  const [visibleCount, setVisibleCount] = useState(SESSIONS_PAGE_SIZE)
 
   const dog = useLiveQuery(
     async () => dogId ? (await db.dogs.get(dogId)) ?? null : null,
@@ -62,9 +65,17 @@ export function DogGalleryPage() {
     [dogId],
   )
   const loadedGallerySessions = gallerySessions ?? []
+  const visibleGallerySessions = useMemo(
+    () => loadedGallerySessions.slice(0, visibleCount),
+    [loadedGallerySessions, visibleCount],
+  )
   const selectedSession = selectedSessionId
     ? loadedGallerySessions.find((row) => row.session.id === selectedSessionId) ?? null
     : null
+
+  useEffect(() => {
+    setVisibleCount(SESSIONS_PAGE_SIZE)
+  }, [dogId])
 
   const openComparison = useCallback((sessionId: string): void => {
     const next = new URLSearchParams(searchParams)
@@ -122,7 +133,7 @@ export function DogGalleryPage() {
         </Card>
       ) : (
         <div className="grid gap-4">
-          {loadedGallerySessions.map((row) => (
+          {visibleGallerySessions.map((row) => (
             <Card key={row.session.id}>
               <CardHeader className="p-4">
                 <CardTitle className="text-base">{formatAppointmentDateTime(row.appointment)}</CardTitle>
@@ -142,6 +153,17 @@ export function DogGalleryPage() {
               </CardContent>
             </Card>
           ))}
+          {visibleCount < loadedGallerySessions.length && (
+            <div className="flex justify-center">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setVisibleCount((count) => count + SESSIONS_PAGE_SIZE)}
+              >
+                {t('loadMoreSessions')}
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
@@ -176,7 +198,13 @@ function GalleryThumb({
       <div className="border-b bg-background px-3 py-2 text-sm font-medium text-gray-900">{label}</div>
       <div className="grid aspect-[4/3] place-items-center text-sm text-muted-foreground">
         {url ? (
-          <img src={url} alt={label} className="h-full w-full object-cover" />
+          <img
+            src={url}
+            alt={label}
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover"
+          />
         ) : (
           <span className="inline-flex items-center gap-2 px-3 text-center">
             <ImageIcon className="h-4 w-4" />

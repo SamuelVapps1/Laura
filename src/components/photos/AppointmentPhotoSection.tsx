@@ -4,6 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 
 import { PhotoComparisonModal } from '@/components/photos/PhotoComparisonModal'
 import { Button } from '@/components/ui/button'
+import { useAppBusy } from '@/context/AppBusyContext'
 import type { PhotoAsset, PhotoKind } from '@/db/db'
 import { DB_ERROR } from '@/db/errors'
 import {
@@ -25,7 +26,6 @@ const PHOTO_SLOTS = [
   { kind: 'after', label: t('labelAfter'), missingLabel: t('photoMissingAfter') },
 ] as const
 
-type ProcessingState = Record<PhotoKind, boolean>
 type ErrorState = Record<PhotoKind, string | null>
 
 const EMPTY_PHOTOS = {
@@ -35,14 +35,19 @@ const EMPTY_PHOTOS = {
 
 export function AppointmentPhotoSection({ appointmentId, dogId }: AppointmentPhotoSectionProps) {
   const [sessionId, setSessionId] = useState<string | null>(null)
-  const [processing, setProcessing] = useState<ProcessingState>({ before: false, after: false })
+  const [activeProcessingKind, setActiveProcessingKind] = useState<PhotoKind | null>(null)
   const [errors, setErrors] = useState<ErrorState>({ before: null, after: null })
   const [comparisonOpen, setComparisonOpen] = useState(false)
+  const activeProcessingKindRef = useRef<PhotoKind | null>(null)
+  const { startBusy, endBusy } = useAppBusy()
+  const isAnyProcessing = activeProcessingKind !== null
 
   useEffect(() => {
     let active = true
 
     setSessionId(null)
+    setActiveProcessingKind(null)
+    activeProcessingKindRef.current = null
     getOrCreatePhotoSessionForAppointment(appointmentId)
       .then((session) => {
         if (active) {
@@ -69,10 +74,18 @@ export function AppointmentPhotoSection({ appointmentId, dogId }: AppointmentPho
   async function handleFile(kind: PhotoKind, file: File | undefined): Promise<void> {
     if (!file || !sessionId) return
 
+    if (activeProcessingKindRef.current !== null) {
+      setErrors((current) => ({ ...current, [kind]: t('photoProcessingWait') }))
+      return
+    }
+
+    activeProcessingKindRef.current = kind
     setErrors((current) => ({ ...current, [kind]: null }))
-    setProcessing((current) => ({ ...current, [kind]: true }))
+    setActiveProcessingKind(kind)
+    let busyToken: string | null = null
 
     try {
+      busyToken = startBusy('photo')
       await processAndStorePhoto(file, {
         dogId,
         appointmentId,
@@ -82,7 +95,11 @@ export function AppointmentPhotoSection({ appointmentId, dogId }: AppointmentPho
     } catch (error) {
       setErrors((current) => ({ ...current, [kind]: getPhotoErrorMessage(error) }))
     } finally {
-      setProcessing((current) => ({ ...current, [kind]: false }))
+      if (busyToken) {
+        endBusy(busyToken)
+      }
+      activeProcessingKindRef.current = null
+      setActiveProcessingKind(null)
     }
   }
 
@@ -96,14 +113,18 @@ export function AppointmentPhotoSection({ appointmentId, dogId }: AppointmentPho
             label={slot.label}
             missingLabel={slot.missingLabel}
             photo={photos[slot.kind].thumb}
-            processing={processing[slot.kind]}
+            processing={activeProcessingKind === slot.kind}
             error={errors[slot.kind]}
-            disabled={!sessionId}
+            disabled={!sessionId || isAnyProcessing}
             onFileSelected={handleFile}
             onOpenComparison={() => setComparisonOpen(true)}
           />
         ))}
       </div>
+
+      {isAnyProcessing && (
+        <p className="text-xs text-muted-foreground">{t('photoProcessingWait')}</p>
+      )}
 
       {sessionId && (
         <PhotoComparisonModal open={comparisonOpen} onOpenChange={setComparisonOpen} sessionId={sessionId} />
@@ -159,7 +180,7 @@ function PhotoSlot({
   const uploadInputRef = useRef<HTMLInputElement | null>(null)
   const captureInputRef = useRef<HTMLInputElement | null>(null)
   const thumbUrl = useObjectUrl(photo?.blob)
-  const slotDisabled = disabled || processing
+  const slotDisabled = disabled
 
   async function handleChange(event: ChangeEvent<HTMLInputElement>): Promise<void> {
     const file = event.currentTarget.files?.[0]
@@ -190,7 +211,13 @@ function PhotoSlot({
         onClick={onOpenComparison}
       >
         {thumbUrl ? (
-          <img src={thumbUrl} alt={label} className="h-full w-full object-cover" />
+          <img
+            src={thumbUrl}
+            alt={label}
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover"
+          />
         ) : (
           <span className="inline-flex items-center gap-2">
             <ImageIcon className="h-4 w-4" />
