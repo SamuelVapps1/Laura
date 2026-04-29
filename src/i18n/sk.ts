@@ -43,6 +43,7 @@
   buttonDeleting: "Odstraňujem...",
   buttonClose: "Zavrieť",
   buttonNewAppointment: "Nový termín",
+  buttonAppointmentTags: "Štítky",
   addAppointment: "Pridať termín",
   printDay: "Tla\u010di\u0165 de\u0148",
   dailySchedule: "Denn\u00fd rozpis",

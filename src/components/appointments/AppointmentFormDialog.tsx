@@ -5,6 +5,7 @@ import { DogFormDialog } from '@/components/dogs/DogFormDialog'
 import { OwnerDogSelect } from '@/components/dogs/OwnerDogSelect'
 import { OwnerSearchSelect } from '@/components/dogs/OwnerSearchSelect'
 import { EntityTagChips } from '@/components/tags/EntityTagChips'
+import { ScopedTagSelector } from '@/components/tags/ScopedTagSelector'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -19,6 +20,7 @@ import {
   updateAppointment,
   type NewAppointmentInput,
 } from '@/db/repositories/appointments'
+import { getTagApplicationsForEntity, setTagApplicationsForEntity } from '@/db/repositories/tags'
 import { t } from '@/i18n/sk'
 import {
   appointmentStatusOptions,
@@ -54,6 +56,8 @@ export function AppointmentFormDialog({
   const [dogId, setDogId] = useState('')
   const [dogFormOpen, setDogFormOpen] = useState(false)
   const [recentlyCreatedDog, setRecentlyCreatedDog] = useState<Dog | null>(null)
+  const [tagsExpanded, setTagsExpanded] = useState(false)
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
 
   const [servicePresetId, setServicePresetId] = useState<string>('small_grooming')
   const [customServiceName, setCustomServiceName] = useState('')
@@ -117,6 +121,37 @@ export function AppointmentFormDialog({
 
     setError(null)
   }, [open, appointment, selectedDate])
+
+  useEffect(() => {
+    if (!open) return
+
+    let cancelled = false
+
+    if (!appointment) {
+      setSelectedTagIds([])
+      setTagsExpanded(false)
+      return () => {
+        cancelled = true
+      }
+    }
+
+    void getTagApplicationsForEntity('appointment', appointment.id)
+      .then((applications) => {
+        if (cancelled) return
+        const ids = applications.map((application) => application.tagId)
+        setSelectedTagIds(ids)
+        setTagsExpanded(ids.length > 0)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setSelectedTagIds([])
+        setTagsExpanded(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [open, appointment?.id])
 
   useEffect(() => {
     if (!open) return
@@ -256,11 +291,16 @@ export function AppointmentFormDialog({
         cameDirty,
       }
 
+      let savedAppointmentId: string
       if (appointment) {
-        await updateAppointment(appointment.id, input)
+        const updated = await updateAppointment(appointment.id, input)
+        savedAppointmentId = updated.id
       } else {
-        await createAppointment(input)
+        const created = await createAppointment(input)
+        savedAppointmentId = created.id
       }
+
+      await setTagApplicationsForEntity('appointment', savedAppointmentId, selectedTagIds)
 
       onOpenChange(false)
     } catch (err) {
@@ -275,6 +315,8 @@ export function AppointmentFormDialog({
       setError(null)
       setDogFormOpen(false)
       setRecentlyCreatedDog(null)
+      setSelectedTagIds([])
+      setTagsExpanded(false)
     }
     onOpenChange(nextOpen)
   }
@@ -387,6 +429,28 @@ export function AppointmentFormDialog({
                 </Select>
               </div>
 
+              {!tagsExpanded ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setTagsExpanded(true)}
+                  disabled={isSaving}
+                >
+                  {t('buttonAppointmentTags')}
+                  {selectedTagIds.length > 0 ? ` (${selectedTagIds.length})` : ''}
+                </Button>
+              ) : (
+                <div className="grid gap-2 border-t border-border pt-3">
+                  <Label>{t('appointmentTags')}</Label>
+                  <ScopedTagSelector
+                    scope="appointment"
+                    selectedTagIds={selectedTagIds}
+                    onChange={setSelectedTagIds}
+                    disabled={isSaving}
+                  />
+                </div>
+              )}
+
               <div className="grid gap-2">
                 <Label htmlFor="appointment-notes">{t('labelNotes')}</Label>
                 <Textarea
@@ -458,6 +522,12 @@ function getAppointmentFormError(error: unknown): string {
       return t('errorOwnerNotFound')
     case DB_ERROR.APPOINTMENT_NOT_FOUND:
       return t('errorAppointmentNotFound')
+    case DB_ERROR.TAG_DEFINITION_NOT_FOUND:
+      return t('errorTagNotFound')
+    case DB_ERROR.INVALID_TAG_SCOPE:
+      return t('errorInvalidTagScope')
+    case DB_ERROR.TAG_TARGET_NOT_FOUND:
+      return t('errorTagTargetNotFound')
     case DB_ERROR.INVALID_APPOINTMENT_DURATION:
       return t('errorInvalidDuration')
     case DB_ERROR.INVALID_APPOINTMENT_PRICE:
