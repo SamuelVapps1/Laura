@@ -58,6 +58,8 @@ export function AppointmentFormDialog({
   const [recentlyCreatedDog, setRecentlyCreatedDog] = useState<Dog | null>(null)
   const [tagsExpanded, setTagsExpanded] = useState(false)
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
+  const [appointmentTagsLoaded, setAppointmentTagsLoaded] = useState(false)
+  const [appointmentTagsLoadError, setAppointmentTagsLoadError] = useState(false)
 
   const [servicePresetId, setServicePresetId] = useState<string>('small_grooming')
   const [customServiceName, setCustomServiceName] = useState('')
@@ -130,10 +132,15 @@ export function AppointmentFormDialog({
     if (!appointment) {
       setSelectedTagIds([])
       setTagsExpanded(false)
+      setAppointmentTagsLoaded(true)
+      setAppointmentTagsLoadError(false)
       return () => {
         cancelled = true
       }
     }
+
+    setAppointmentTagsLoaded(false)
+    setAppointmentTagsLoadError(false)
 
     void getTagApplicationsForEntity('appointment', appointment.id)
       .then((applications) => {
@@ -141,11 +148,12 @@ export function AppointmentFormDialog({
         const ids = applications.map((application) => application.tagId)
         setSelectedTagIds(ids)
         setTagsExpanded(ids.length > 0)
+        setAppointmentTagsLoaded(true)
       })
       .catch(() => {
         if (cancelled) return
-        setSelectedTagIds([])
-        setTagsExpanded(false)
+        setAppointmentTagsLoaded(false)
+        setAppointmentTagsLoadError(true)
       })
 
     return () => {
@@ -226,6 +234,11 @@ export function AppointmentFormDialog({
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
     setError(null)
+
+    if (!appointmentTagsLoaded) {
+      setError(t('validationError'))
+      return
+    }
 
     if (!ownerId) {
       setError(t('errorOwnerRequired'))
@@ -317,6 +330,8 @@ export function AppointmentFormDialog({
       setRecentlyCreatedDog(null)
       setSelectedTagIds([])
       setTagsExpanded(false)
+      setAppointmentTagsLoaded(false)
+      setAppointmentTagsLoadError(false)
     }
     onOpenChange(nextOpen)
   }
@@ -434,7 +449,7 @@ export function AppointmentFormDialog({
                   type="button"
                   variant="outline"
                   onClick={() => setTagsExpanded(true)}
-                  disabled={isSaving}
+                  disabled={isSaving || !appointmentTagsLoaded}
                 >
                   {t('buttonAppointmentTags')}
                   {selectedTagIds.length > 0 ? ` (${selectedTagIds.length})` : ''}
@@ -446,10 +461,12 @@ export function AppointmentFormDialog({
                     scope="appointment"
                     selectedTagIds={selectedTagIds}
                     onChange={setSelectedTagIds}
-                    disabled={isSaving}
+                    disabled={isSaving || !appointmentTagsLoaded}
                   />
                 </div>
               )}
+
+              {appointmentTagsLoadError && <p className="text-sm text-red-500">{t('validationError')}</p>}
 
               <div className="grid gap-2">
                 <Label htmlFor="appointment-notes">{t('labelNotes')}</Label>
@@ -488,7 +505,7 @@ export function AppointmentFormDialog({
               <Button type="button" variant="outline" onClick={() => handleOpenChange(false)} disabled={isSaving}>
                 {t('buttonCancel')}
               </Button>
-              <Button type="submit" disabled={isSaving}>
+              <Button type="submit" disabled={isSaving || !appointmentTagsLoaded}>
                 {isSaving ? t('buttonSaving') : t('buttonSave')}
               </Button>
             </DialogFooter>
