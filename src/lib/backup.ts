@@ -13,6 +13,7 @@ import {
   type EncryptedBackupManifest,
 } from '@/lib/backupCrypto'
 import { db, type AppSetting, type Appointment, type Dog, type DogTag, type EntityId, type EntityNote, type ISODateTime, type Owner, type PhotoAsset, type PhotoKind, type PhotoSession, type PhotoVariant, type Tag, type TagApplication, type TagDefinition, type TagScope } from '@/db/db'
+import { cleanupDanglingReferences } from '@/db/repositories/maintenance'
 import { LAST_BACKUP_AT_KEY, setLastBackupAt } from '@/db/repositories/settings'
 
 export const BACKUP_FORMAT = 'salon-app-backup'
@@ -246,6 +247,7 @@ export async function exportBackup(
 }
 
 async function buildPlainBackupZip(onProgress?: (progress: BackupProgress) => void): Promise<Uint8Array> {
+  await cleanupDanglingReferences()
   const snapshot = await readBackupSnapshot()
   const data: BackupData = {
     owners: snapshot.owners,
